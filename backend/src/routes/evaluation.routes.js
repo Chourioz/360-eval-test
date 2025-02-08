@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const evaluationController = require('../controllers/evaluation.controller');
 const { verifyToken, restrictTo } = require('../middlewares/auth');
-const { validateEvaluation } = require('../middlewares/validators');
+const { validateEvaluation, validateEvaluationUpdate } = require('../middlewares/validators');
 
 // Proteger todas las rutas
 router.use(verifyToken);
@@ -11,16 +11,19 @@ router.use(verifyToken);
 router.get('/', evaluationController.getAllEvaluations);
 router.get('/:id', evaluationController.getEvaluation);
 
-// Rutas restringidas a admin y manager
-const restrictToAdminAndManager = restrictTo('admin', 'manager');
-router.use(restrictToAdminAndManager);
-
-router.post('/', validateEvaluation, evaluationController.createEvaluation);
-router.patch('/:id', validateEvaluation, evaluationController.updateEvaluation);
-router.delete('/:id', evaluationController.deleteEvaluation);
-
-// Rutas especiales
+// Ruta para iniciar evaluación - accesible para admin, manager y el empleado evaluado
 router.post('/:id/start', evaluationController.startEvaluation);
+
+// Ruta para enviar feedback - accesible para evaluadores asignados
+router.post('/:id/feedback', evaluationController.submitFeedback);
+
+// Ruta para completar evaluación - accesible para admin, manager y el empleado en caso de autoevaluación
 router.post('/:id/complete', evaluationController.completeEvaluation);
+
+// Rutas restringidas a admin y manager
+router.use(restrictTo('admin', 'manager'));
+
+// Usar validación completa solo para creación
+router.post('/', validateEvaluation, evaluationController.createEvaluation);
 
 module.exports = router; 

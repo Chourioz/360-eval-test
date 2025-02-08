@@ -75,7 +75,10 @@ const Evaluations: React.FC = () => {
   const handleSubmit = async (data: any) => {
     try {
       if (selectedEvaluation) {
-        await updateEvaluation({ id: selectedEvaluation._id, data });
+        await updateEvaluation({ 
+          id: selectedEvaluation._id, 
+          data 
+        });
       } else {
         await createEvaluation(data);
       }

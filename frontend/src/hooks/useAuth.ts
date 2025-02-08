@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/auth.service';
 import type { LoginCredentials, RegisterData } from '@/types';
+import { useNavigate } from '@tanstack/react-router';
 
 export function useAuth() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: authData, isLoading: isAuthLoading, isError } = useQuery({
     queryKey: ['auth'],
@@ -16,8 +18,14 @@ export function useAuth() {
 
   const loginMutation = useMutation({
     mutationFn: (credentials: LoginCredentials) => authService.login(credentials),
-    onSuccess: (data) => {
-      queryClient.setQueryData(['auth'], data);
+    onSuccess: (response) => {
+      queryClient.setQueryData(['auth'], {
+        data: {
+          user: response.data,
+          token: response.token
+        }
+      });
+      navigate({ to: '/', replace: true });
     },
   });
 
@@ -25,6 +33,7 @@ export function useAuth() {
     mutationFn: (data: RegisterData) => authService.register(data),
     onSuccess: (data) => {
       queryClient.setQueryData(['auth'], data);
+      navigate({ to: '/', replace: true });
     },
   });
 
@@ -35,6 +44,7 @@ export function useAuth() {
     },
     onSuccess: () => {
       queryClient.clear();
+      navigate({ to: '/login', replace: true });
     },
   });
 

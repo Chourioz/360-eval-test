@@ -1,5 +1,6 @@
-import { apiService } from "./api";
-import type { ApiResponse, Evaluation } from "@/types";
+import { apiService as api } from "@/services/api";
+import type { Evaluation, FeedbackResponse } from "@/types";
+import type { ApiResponse } from "@/types";
 
 interface CreateEvaluationData {
   employee: string;
@@ -26,35 +27,60 @@ interface CreateEvaluationData {
 interface UpdateEvaluationData extends Partial<CreateEvaluationData> {}
 
 class EvaluationService {
-  async getEvaluations(): Promise<ApiResponse<Evaluation[]>> {
-    return apiService.get("/evaluations");
+  async getEvaluations() {
+    const response = await api.get<{
+      status: string;
+      results: number;
+      data: Evaluation[];
+    }>("/evaluations");
+    return response;
   }
 
-  async getEvaluation(id: string): Promise<ApiResponse<Evaluation>> {
-    return apiService.get(`/evaluations/${id}`);
+  async getEvaluation(id: string) {
+    const response = await api.get<ApiResponse<Evaluation>>(
+      `/evaluations/${id}`
+    );
+    console.log("RESPONSE ===> ", response);
+    return response;
   }
 
-  async createEvaluation(data: CreateEvaluationData): Promise<ApiResponse<Evaluation>> {
-    return apiService.post("/evaluations", data);
+  async createEvaluation(
+    data: CreateEvaluationData
+  ): Promise<ApiResponse<Evaluation>> {
+    return api.post("/evaluations", data);
   }
 
   async updateEvaluation(
     id: string,
     data: UpdateEvaluationData
   ): Promise<ApiResponse<Evaluation>> {
-    return apiService.patch(`/evaluations/${id}`, data);
+    return api.patch(`/evaluations/${id}`, data);
   }
 
-  async deleteEvaluation(id: string): Promise<ApiResponse<void>> {
-    return apiService.delete(`/evaluations/${id}`);
+  async deleteEvaluation(id: string) {
+    const response = await api.delete<ApiResponse<void>>(`/evaluations/${id}`);
+    return response.data;
   }
 
   async startEvaluation(id: string): Promise<ApiResponse<Evaluation>> {
-    return apiService.post(`/evaluations/${id}/start`, {});
+    const response = await api.post<ApiResponse<Evaluation>>(`/evaluations/${id}/start`);
+    return response;
   }
 
-  async completeEvaluation(id: string): Promise<ApiResponse<Evaluation>> {
-    return apiService.post(`/evaluations/${id}/complete`, {});
+  async completeEvaluation(id: string) {
+    const response = await api.post<ApiResponse<Evaluation>>(
+      `/evaluations/${id}/complete`,
+      {}
+    );
+    return response.data;
+  }
+
+  async submitFeedback(evaluationId: string, responses: FeedbackResponse[]) {
+    const response = await api.post<ApiResponse<void>>(
+      `/evaluations/${evaluationId}/feedback`,
+      { responses }
+    );
+    return response.data;
   }
 }
 

@@ -20,6 +20,7 @@ import NotFound from '@/pages/NotFound';
 import Unauthorized from '@/pages/Unauthorized';
 import MainLayout from '@/components/layout/MainLayout';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
+import EvaluationForm from '@/pages/EvaluationForm';
 
 // Root Route
 const rootRoute = createRootRoute({
@@ -159,6 +160,21 @@ const pendingFeedbackRoute = createRoute({
   component: PendingFeedback,
 });
 
+export const evaluationFormRoute = createRoute({
+  getParentRoute: () => protectedLayoutRoute,
+  path: '/evaluations/$id',
+  component: EvaluationForm,
+  beforeLoad: () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      throw redirect({
+        to: '/login',
+        replace: true
+      });
+    }
+  }
+});
+
 const notFoundRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '*',
@@ -179,6 +195,7 @@ const routeTree = rootRoute.addChildren([
     myEvaluationsRoute,
     settingsRoute,
     pendingFeedbackRoute,
+    evaluationFormRoute,
   ]),
 ]);
 

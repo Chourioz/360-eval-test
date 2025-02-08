@@ -7,43 +7,158 @@ import {
   Grid,
   LinearProgress,
   Chip,
-  IconButton,
-  Tooltip,
   Stack,
-  Alert
+  Alert,
+  CardActions,
+  Button,
+  Tabs,
+  Tab,
+  CircularProgress
 } from '@mui/material';
-import {
-  Edit as EditIcon,
-  Delete as DeleteIcon,
-  PlayArrow as StartIcon,
-  Check as CompleteIcon
-} from '@mui/icons-material';
 import { useEvaluations } from '@/hooks/useEvaluations';
 import { useAuth } from '@/hooks/useAuth';
 import type { Evaluation } from '@/types';
 
-const statusColors = {
-  draft: 'default',
-  in_progress: 'primary',
-  pending_review: 'warning',
-  completed: 'success'
-} as const;
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
 
-const statusLabels = {
-  draft: 'Borrador',
-  in_progress: 'En Progreso',
-  pending_review: 'Pendiente de Revisión',
-  completed: 'Completado'
-} as const;
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
 
-const evaluationTypeLabels = {
-  self: 'Auto-evaluación',
-  peer: 'Entre pares',
-  manager: 'Por supervisor',
-  '360': '360°'
-} as const;
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`evaluation-tabpanel-${index}`}
+      aria-labelledby={`evaluation-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ p: 3 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+function a11yProps(index: number) {
+  return {
+    id: `evaluation-tab-${index}`,
+    'aria-controls': `evaluation-tabpanel-${index}`,
+  };
+}
+
+interface EvaluationCardProps {
+  evaluation: Evaluation;
+  onStart: (id: string) => void;
+  onComplete: (id: string) => void;
+  onDelete: (id: string) => void;
+  startLoading: boolean;
+  completeLoading: boolean;
+  deleteLoading: boolean;
+}
+
+const EvaluationCard: React.FC<EvaluationCardProps> = ({
+  evaluation,
+  onStart,
+  onComplete,
+  onDelete,
+  startLoading,
+  completeLoading,
+  deleteLoading
+}) => (
+  <Card sx={{ mb: 2 }}>
+    <CardContent>
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={8}>
+          <Typography variant="h6" gutterBottom>
+            Evaluación {evaluation.evaluationType}
+          </Typography>
+          <Typography color="text.secondary" gutterBottom>
+            {evaluation.employee.user.firstName} {evaluation.employee.user.lastName}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Departamento: {evaluation.employee.department}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            Cargo: {evaluation.employee.position}
+          </Typography>
+        </Grid>
+        <Grid item xs={12} md={4}>
+          <Box sx={{ textAlign: 'right' }}>
+            <Typography variant="body2" color="text.secondary">
+              Periodo: {new Date(evaluation.period.startDate).toLocaleDateString()} - {new Date(evaluation.period.endDate).toLocaleDateString()}
+            </Typography>
+            <Box sx={{ mt: 1 }}>
+              <LinearProgress
+                variant="determinate"
+                value={evaluation.progress || 0}
+                sx={{ mb: 1 }}
+              />
+              <Typography variant="body2" color="text.secondary">
+                Progreso: {evaluation.progress || 0}%
+              </Typography>
+            </Box>
+          </Box>
+        </Grid>
+      </Grid>
+      <Box sx={{ mt: 2 }}>
+        <Typography variant="subtitle2" gutterBottom>
+          Evaluadores:
+        </Typography>
+        <Stack direction="row" spacing={1}>
+          {evaluation.evaluators.map((evaluator, index) => (
+            <Chip
+              key={index}
+              label={`${evaluator.user.firstName} ${evaluator.user.lastName}`}
+              size="small"
+              color={evaluator.status === 'completed' ? 'success' : 'default'}
+            />
+          ))}
+        </Stack>
+      </Box>
+    </CardContent>
+    <CardActions>
+      {evaluation.status === 'draft' && (
+        <Button
+          size="small"
+          onClick={() => onStart(evaluation._id)}
+          disabled={startLoading}
+        >
+          Iniciar
+        </Button>
+      )}
+      {evaluation.status === 'in_progress' && (
+        <Button
+          size="small"
+          onClick={() => onComplete(evaluation._id)}
+          disabled={completeLoading}
+        >
+          Completar
+        </Button>
+      )}
+      <Button
+        size="small"
+        color="error"
+        onClick={() => onDelete(evaluation._id)}
+        disabled={deleteLoading}
+      >
+        Eliminar
+      </Button>
+    </CardActions>
+  </Card>
+);
+
+const getFilteredEvaluations = (evaluations: Evaluation[], status: 'draft' | 'in_progress' | 'completed'): Evaluation[] => {
+  return evaluations.filter((evaluation) => evaluation.status === status);
+};
 
 export const MyEvaluations: React.FC = () => {
+  const [value, setValue] = React.useState(0);
   const { user } = useAuth();
   const {
     evaluations,
@@ -57,32 +172,22 @@ export const MyEvaluations: React.FC = () => {
     deleteLoading
   } = useEvaluations();
 
-  const handleStartEvaluation = (evaluationId: string) => {
-    startEvaluation(evaluationId);
-  };
-
-  const handleCompleteEvaluation = (evaluationId: string) => {
-    completeEvaluation(evaluationId);
-  };
-
-  const handleDeleteEvaluation = (evaluationId: string) => {
-    if (window.confirm('¿Está seguro de eliminar esta evaluación?')) {
-      deleteEvaluation(evaluationId);
-    }
-  };
+  const handleTabChange = React.useCallback((event: React.SyntheticEvent, newValue: number) => {
+    setValue(newValue);
+  }, []);
 
   if (isLoading) {
     return (
-      <Box sx={{ width: '100%', mt: 2 }}>
-        <LinearProgress />
+      <Box sx={{ display: 'flex', justifyContent: 'center', p: 3 }}>
+        <CircularProgress />
       </Box>
     );
   }
 
   if (error) {
     return (
-      <Alert severity="error" sx={{ mt: 2 }}>
-        {error.message || 'Error al cargar las evaluaciones'}
+      <Alert severity="error" sx={{ m: 2 }}>
+        Error al cargar las evaluaciones: {error instanceof Error ? error.message : 'Error desconocido'}
       </Alert>
     );
   }
@@ -102,112 +207,60 @@ export const MyEvaluations: React.FC = () => {
   }
 
   return (
-    <Grid container spacing={2}>
-      {myEvaluations.map((evaluation: Evaluation) => (
-        <Grid item xs={12} sm={6} md={4} key={evaluation._id}>
-          <Card>
-            <CardContent>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Empleado
-                  </Typography>
-                  <Typography variant="body1">
-                    {evaluation.employee.user.firstName} {evaluation.employee.user.lastName}
-                  </Typography>
-                </Box>
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
+        <Tabs value={value} onChange={handleTabChange} aria-label="evaluation tabs">
+          <Tab label="Borradores" {...a11yProps(0)} />
+          <Tab label="En Progreso" {...a11yProps(1)} />
+          <Tab label="Completadas" {...a11yProps(2)} />
+        </Tabs>
+      </Box>
 
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Tipo
-                  </Typography>
-                  <Chip
-                    label={evaluationTypeLabels[evaluation.evaluationType]}
-                    size="small"
-                  />
-                </Box>
+      <TabPanel value={value} index={0}>
+        {getFilteredEvaluations(myEvaluations, 'draft').map((evaluation) => (
+          <EvaluationCard
+            key={evaluation._id}
+            evaluation={evaluation}
+            onStart={startEvaluation}
+            onComplete={completeEvaluation}
+            onDelete={deleteEvaluation}
+            startLoading={startLoading}
+            completeLoading={completeLoading}
+            deleteLoading={deleteLoading}
+          />
+        ))}
+      </TabPanel>
 
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Estado
-                  </Typography>
-                  <Chip
-                    label={statusLabels[evaluation.status]}
-                    color={statusColors[evaluation.status]}
-                    size="small"
-                  />
-                </Box>
+      <TabPanel value={value} index={1}>
+        {getFilteredEvaluations(myEvaluations, 'in_progress').map((evaluation) => (
+          <EvaluationCard
+            key={evaluation._id}
+            evaluation={evaluation}
+            onStart={startEvaluation}
+            onComplete={completeEvaluation}
+            onDelete={deleteEvaluation}
+            startLoading={startLoading}
+            completeLoading={completeLoading}
+            deleteLoading={deleteLoading}
+          />
+        ))}
+      </TabPanel>
 
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                    Progreso
-                  </Typography>
-                  <LinearProgress
-                    variant="determinate"
-                    value={getEvaluationProgress(evaluation)}
-                    sx={{ height: 8, borderRadius: 1 }}
-                  />
-                  <Typography variant="caption" color="text.secondary" align="right" display="block">
-                    {getEvaluationProgress(evaluation)}%
-                  </Typography>
-                </Box>
-
-                <Box>
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Período
-                  </Typography>
-                  <Typography variant="body2">
-                    {new Date(evaluation.period.startDate).toLocaleDateString()} -{' '}
-                    {new Date(evaluation.period.endDate).toLocaleDateString()}
-                  </Typography>
-                </Box>
-
-                <Stack direction="row" spacing={1} justifyContent="flex-end">
-                  {evaluation.status === 'draft' && (
-                    <>
-                      <Tooltip title="Iniciar">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleStartEvaluation(evaluation._id)}
-                          disabled={startLoading}
-                        >
-                          <StartIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Editar">
-                        <IconButton size="small">
-                          <EditIcon />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Eliminar">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDeleteEvaluation(evaluation._id)}
-                          disabled={deleteLoading}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </Tooltip>
-                    </>
-                  )}
-                  {evaluation.status === 'in_progress' && (
-                    <Tooltip title="Completar">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleCompleteEvaluation(evaluation._id)}
-                        disabled={completeLoading}
-                      >
-                        <CompleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  )}
-                </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
+      <TabPanel value={value} index={2}>
+        {getFilteredEvaluations(myEvaluations, 'completed').map((evaluation) => (
+          <EvaluationCard
+            key={evaluation._id}
+            evaluation={evaluation}
+            onStart={startEvaluation}
+            onComplete={completeEvaluation}
+            onDelete={deleteEvaluation}
+            startLoading={startLoading}
+            completeLoading={completeLoading}
+            deleteLoading={deleteLoading}
+          />
+        ))}
+      </TabPanel>
+    </Box>
   );
 };
 

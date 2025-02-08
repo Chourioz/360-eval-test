@@ -5,150 +5,122 @@ const evaluationSchema = new mongoose.Schema(
     employee: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee',
-      required: [true, 'El empleado es requerido'],
-      autopopulate: true
+      required: true,
+      index: true
     },
     evaluationType: {
       type: String,
-      enum: ['360', 'self', 'peer', 'manager'],
-      required: [true, 'El tipo de evaluación es requerido'],
+      enum: ['self', 'peer', 'manager', '360'],
+      required: true
     },
     period: {
       startDate: {
         type: Date,
-        required: [true, 'La fecha de inicio es requerida'],
+        required: true
       },
       endDate: {
         type: Date,
-        required: [true, 'La fecha de fin es requerida'],
-      },
+        required: true
+      }
     },
     status: {
       type: String,
       enum: ['draft', 'in_progress', 'pending_review', 'completed'],
-      default: 'draft',
+      default: 'draft'
     },
     categories: [
       {
         name: {
           type: String,
-          required: [true, 'El nombre de la categoría es requerido'],
+          required: true
         },
-        description: String,
         weight: {
           type: Number,
-          required: [true, 'El peso de la categoría es requerido'],
+          required: true,
           min: 0,
-          max: 100,
+          max: 100
         },
         criteria: [
           {
             description: {
               type: String,
-              required: [true, 'La descripción del criterio es requerida'],
+              required: true
             },
             weight: {
               type: Number,
-              required: [true, 'El peso del criterio es requerido'],
+              required: true,
               min: 0,
-              max: 100,
-            },
-          },
-        ],
-      },
+              max: 100
+            }
+          }
+        ]
+      }
     ],
     evaluators: [
       {
         user: {
           type: mongoose.Schema.Types.ObjectId,
           ref: 'User',
-          required: true,
+          required: true
         },
         relationship: {
           type: String,
           enum: ['self', 'peer', 'manager', 'subordinate'],
-          required: true,
+          required: true
         },
         status: {
           type: String,
           enum: ['pending', 'completed'],
-          default: 'pending',
+          default: 'pending'
         },
-        completedAt: Date,
-      },
+        completedAt: Date
+      }
     ],
     metadata: {
       createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
+        required: true
       },
       lastModifiedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'User'
       },
       template: String
-    },
+    }
   },
   {
     timestamps: true,
     toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
-// Índices
+// Índices compuestos
 evaluationSchema.index({ employee: 1, status: 1 });
 evaluationSchema.index({ 'evaluators.user': 1, status: 1 });
 evaluationSchema.index({ 'period.startDate': 1, 'period.endDate': 1 });
-evaluationSchema.index({ 'metadata.createdBy': 1 });
 
-// Virtual para calcular el progreso general
-evaluationSchema.virtual('progress').get(function () {
-  if (this.status === 'draft') return 0;
-  if (this.status === 'completed') return 100;
-
-  const totalEvaluators = this.evaluators.length;
-  if (totalEvaluators === 0) return 0;
-
-  const completedEvaluators = this.evaluators.filter(
-    (e) => e.status === 'completed'
-  ).length;
+// Virtual para calcular el progreso
+evaluationSchema.virtual('progress').get(function() {
+  if (!this.evaluators || this.evaluators.length === 0) return 0;
   
-  return Math.round((completedEvaluators / totalEvaluators) * 100);
+  const completedEvaluators = this.evaluators.filter(e => e.status === 'completed').length;
+  return Math.round((completedEvaluators / this.evaluators.length) * 100);
 });
 
 // Virtual para calcular el puntaje promedio
 evaluationSchema.virtual('averageScore').get(function () {
+  // Si no hay evaluadores, retornar 0
   if (!this.evaluators || this.evaluators.length === 0) return 0;
 
-  const completedEvaluators = this.evaluators.filter(
-    (e) => e.status === 'completed'
-  );
-
+  // Contar evaluadores completados
+  const completedEvaluators = this.evaluators.filter(e => e.status === 'completed');
   if (completedEvaluators.length === 0) return 0;
 
-  const totalScore = completedEvaluators.reduce((acc, evaluator) => {
-    const evaluatorScore = evaluator.feedback.reduce((sum, f) => {
-      const category = this.categories.find(
-        (c) => c._id.toString() === f.categoryId.toString()
-      );
-      if (!category) return sum;
-
-      const criteria = category.criteria.find(
-        (cr) => cr._id.toString() === f.criteriaId.toString()
-      );
-      if (!criteria) return sum;
-
-      const weightedScore =
-        (f.score * criteria.weight * category.weight) / 10000;
-      return sum + weightedScore;
-    }, 0);
-
-    return acc + evaluatorScore;
-  }, 0);
-
-  return Number((totalScore / completedEvaluators.length).toFixed(2));
+  // Por ahora retornamos 0 ya que el cálculo real del score
+  // se debe hacer cuando obtengamos el feedback de la colección Feedback
+  return 0;
 });
 
 // Middleware pre-save para validar fechas
@@ -161,10 +133,16 @@ evaluationSchema.pre('save', function (next) {
 
 // Middleware para poblar referencias automáticamente
 evaluationSchema.pre(/^find/, function(next) {
-  this.populate('employee')
-      .populate('evaluators.user', 'firstName lastName email')
-      .populate('metadata.createdBy', 'firstName lastName')
-      .populate('metadata.lastModifiedBy', 'firstName lastName');
+  this.populate({
+    path: 'employee',
+    populate: {
+      path: 'user',
+      select: 'firstName lastName email'
+    }
+  })
+  .populate('evaluators.user', 'firstName lastName email')
+  .populate('metadata.createdBy', 'firstName lastName email');
+  
   next();
 });
 
@@ -195,6 +173,37 @@ evaluationSchema.methods.markEvaluatorAsCompleted = function(userId) {
   evaluator.status = 'completed';
   evaluator.completedAt = new Date();
   return this.save();
+};
+
+// Método estático para buscar evaluaciones por usuario
+evaluationSchema.statics.findByUser = async function(userId) {
+  return this.find({
+    $or: [
+      // Evaluaciones donde el usuario es el empleado evaluado
+      {
+        employee: {
+          $in: await mongoose.model('Employee').find({ user: userId }).select('_id')
+        }
+      },
+      // Evaluaciones donde el usuario es evaluador
+      {
+        'evaluators.user': userId
+      },
+      // Evaluaciones creadas por el usuario
+      {
+        'metadata.createdBy': userId
+      }
+    ]
+  })
+  .populate({
+    path: 'employee',
+    populate: {
+      path: 'user',
+      select: 'firstName lastName email'
+    }
+  })
+  .populate('evaluators.user', 'firstName lastName email')
+  .populate('metadata.createdBy', 'firstName lastName email');
 };
 
 const Evaluation = mongoose.model('Evaluation', evaluationSchema);

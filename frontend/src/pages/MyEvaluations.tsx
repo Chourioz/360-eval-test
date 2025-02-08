@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   Box,
   Paper,
@@ -14,17 +14,12 @@ import {
   LinearProgress,
   Divider,
   CircularProgress,
-} from '@mui/material';
-import {
-  Assessment,
-  Schedule,
-  Person,
-  CheckCircle,
-} from '@mui/icons-material';
-import { useAuth } from '@/hooks/useAuth';
-import { useNavigate } from '@tanstack/react-router';
-import { useEvaluations } from '@/hooks/useEvaluations';
-import type { Evaluation } from '@/types';
+} from "@mui/material";
+import { Assessment, Schedule, Person, CheckCircle } from "@mui/icons-material";
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "@tanstack/react-router";
+import { useEvaluations } from "@/hooks/useEvaluations";
+import type { Evaluation } from "@/types";
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -48,40 +43,52 @@ function TabPanel(props: TabPanelProps) {
 }
 
 const statusColors = {
-  draft: 'warning',
-  in_progress: 'info',
-  pending_review: 'warning',
-  completed: 'success',
+  draft: "warning",
+  in_progress: "info",
+  pending_review: "warning",
+  completed: "success",
 } as const;
 
 const statusLabels = {
-  draft: 'Borrador',
-  in_progress: 'En Progreso',
-  pending_review: 'Pendiente de Revisión',
-  completed: 'Completada',
+  draft: "Borrador",
+  in_progress: "En Progreso",
+  pending_review: "Pendiente de Revisión",
+  completed: "Completada",
 } as const;
 
 const MyEvaluations: React.FC = () => {
   const [tabValue, setTabValue] = React.useState(0);
-  const { evaluations, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations();
+  const {
+    evaluations,
+    isLoading: evaluationsLoading,
+    error: evaluationsError,
+  } = useEvaluations();
+  console.log("EVALUATIONS ===> ", evaluations);
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          minHeight: "60vh",
+        }}
+      >
         <CircularProgress />
       </Box>
     );
   }
 
   if (!user) {
-    navigate({ to: '/login' });
+    navigate({ to: "/login" });
     return null;
   }
 
-  if (user.role !== 'employee') {
-    navigate({ to: '/unauthorized' });
+  if (user.role !== "employee") {
+    navigate({ to: "/unauthorized" });
     return null;
   }
 
@@ -89,79 +96,113 @@ const MyEvaluations: React.FC = () => {
     setTabValue(newValue);
   };
 
-  const getFilteredEvaluations = (status: 'pending' | 'in_progress' | 'completed') => {
-    return evaluations?.filter((evaluation) => evaluation.status === status) || [];
+  const getFilteredEvaluations = (
+    status: "draft" | "in_progress" | "completed" | "pending_review"
+  ) => {
+    return (
+      evaluations?.filter(
+        (evaluation: Evaluation) => evaluation.status === status
+      ) || []
+    );
   };
 
-  const EvaluationCard: React.FC<{ evaluation: Evaluation }> = ({ evaluation }) => (
-    <Card>
-      <CardContent>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-          <Chip
-            label={statusLabels[evaluation.status]}
-            color={statusColors[evaluation.status]}
-            size="small"
-          />
-        </Box>
+  const EvaluationCard: React.FC<{ evaluation: Evaluation }> = ({
+    evaluation,
+  }) => {
+    console.log("EVALUATION ===> ", evaluation);
+    const navigate = useNavigate();
+    const { startEvaluation } = useEvaluations();
 
-        <Grid container spacing={2} sx={{ mb: 2 }}>
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Assessment color="primary" />
-              <Typography variant="body2">{evaluation.evaluationType}</Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12} sm={6}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Schedule color="primary" />
-              <Typography variant="body2">
-                Fecha límite: {new Date(evaluation.period.endDate).toLocaleDateString()}
-              </Typography>
-            </Box>
-          </Grid>
-          <Grid item xs={12}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Person color="primary" />
-              <Typography variant="body2">
-                Evaluador: {evaluation.evaluators.map(evaluator => evaluator.user.firstName).join(', ')}
-              </Typography>
-            </Box>
-          </Grid>
-        </Grid>
+    const handleStartEvaluation = async () => {
+      try {
+        if (evaluation.status === "draft")
+          await startEvaluation(evaluation._id);
 
-        <Box sx={{ mt: 2 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Progreso
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {evaluation.progress}%
-            </Typography>
+        navigate({ to: `/evaluations/${evaluation._id}` });
+      } catch (error) {
+        console.error("Error starting evaluation:", error);
+      }
+    };
+
+    return (
+      <Card>
+        <CardContent>
+          <Box sx={{ display: "flex", justifyContent: "space-between", mb: 2 }}>
+            <Chip
+              label={statusLabels[evaluation.status]}
+              color={statusColors[evaluation.status]}
+              size="small"
+            />
           </Box>
-          <LinearProgress
-            variant="determinate"
-            value={evaluation.progress}
-            sx={{ height: 8, borderRadius: 4 }}
-          />
-        </Box>
-      </CardContent>
-      <Divider />
-      <CardActions>
-        <Button
-          size="small"
-          color="primary"
-          startIcon={<Assessment />}
-          disabled={evaluation.status === 'completed'}
-        >
-          {evaluation.status === 'draft'
-            ? 'Comenzar Evaluación'
-            : evaluation.status === 'in_progress'
-            ? 'Continuar Evaluación'
-            : 'Ver Resultados'}
-        </Button>
-      </CardActions>
-    </Card>
-  );
+
+          <Grid container spacing={2} sx={{ mb: 2 }}>
+            <Grid item xs={12} sm={6}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Assessment color="primary" />
+                <Typography variant="body2">
+                  {evaluation.evaluationType}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Schedule color="primary" />
+                <Typography variant="body2">
+                  Fecha límite:{" "}
+                  {new Date(evaluation.period.endDate).toLocaleDateString()}
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid item xs={12}>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Person color="primary" />
+                <Typography variant="body2">
+                  Evaluador:{" "}
+                  {evaluation.evaluators
+                    .map((evaluator) => evaluator.user.firstName)
+                    .join(", ")}
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Box sx={{ mt: 2 }}>
+            <Box
+              sx={{ display: "flex", justifyContent: "space-between", mb: 1 }}
+            >
+              <Typography variant="body2" color="text.secondary">
+                Progreso
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {evaluation.progress}%
+              </Typography>
+            </Box>
+            <LinearProgress
+              variant="determinate"
+              value={evaluation.progress}
+              sx={{ height: 8, borderRadius: 4 }}
+            />
+          </Box>
+        </CardContent>
+        <Divider />
+        <CardActions>
+          <Button
+            size="small"
+            color="primary"
+            startIcon={<Assessment />}
+            onClick={handleStartEvaluation}
+            disabled={evaluation.status === "completed"}
+          >
+            {evaluation.status === "draft"
+              ? "Comenzar Evaluación"
+              : evaluation.status === "in_progress"
+                ? "Continuar Evaluación"
+                : "Ver Resultados"}
+          </Button>
+        </CardActions>
+      </Card>
+    );
+  };
 
   return (
     <Box>
@@ -169,7 +210,8 @@ const MyEvaluations: React.FC = () => {
         Mis Evaluaciones
       </Typography>
       <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Bienvenido, {user?.firstName}. Aquí puedes ver y gestionar tus evaluaciones.
+        Bienvenido, {user?.firstName}. Aquí puedes ver y gestionar tus
+        evaluaciones.
       </Typography>
 
       <Paper sx={{ mt: 3 }}>
@@ -180,14 +222,11 @@ const MyEvaluations: React.FC = () => {
           textColor="primary"
           variant="fullWidth"
         >
+          <Tab icon={<Schedule />} label="Pendientes" iconPosition="start" />
+          <Tab icon={<Assessment />} label="En Progreso" iconPosition="start" />
           <Tab
-            icon={<Schedule />}
-            label="Pendientes"
-            iconPosition="start"
-          />
-          <Tab
-            icon={<Assessment />}
-            label="En Progreso"
+            icon={<CheckCircle />}
+            label="Pendiente de Revisión"
             iconPosition="start"
           />
           <Tab
@@ -199,7 +238,7 @@ const MyEvaluations: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
-            {getFilteredEvaluations('pending').map((evaluation) => (
+            {getFilteredEvaluations("draft").map((evaluation: Evaluation) => (
               <Grid item xs={12} md={6} key={evaluation._id}>
                 <EvaluationCard evaluation={evaluation} />
               </Grid>
@@ -209,21 +248,37 @@ const MyEvaluations: React.FC = () => {
 
         <TabPanel value={tabValue} index={1}>
           <Grid container spacing={3}>
-            {getFilteredEvaluations('in_progress').map((evaluation) => (
-              <Grid item xs={12} md={6} key={evaluation._id}>
-                <EvaluationCard evaluation={evaluation} />
-              </Grid>
-            ))}
+            {getFilteredEvaluations("in_progress").map(
+              (evaluation: Evaluation) => (
+                <Grid item xs={12} md={6} key={evaluation._id}>
+                  <EvaluationCard evaluation={evaluation} />
+                </Grid>
+              )
+            )}
           </Grid>
         </TabPanel>
 
         <TabPanel value={tabValue} index={2}>
           <Grid container spacing={3}>
-            {getFilteredEvaluations('completed').map((evaluation) => (
-              <Grid item xs={12} md={6} key={evaluation._id}>
-                <EvaluationCard evaluation={evaluation} />
-              </Grid>
-            ))}
+            {getFilteredEvaluations("pending_review").map(
+              (evaluation: Evaluation) => (
+                <Grid item xs={12} md={6} key={evaluation._id}>
+                  <EvaluationCard evaluation={evaluation} />
+                </Grid>
+              )
+            )}
+          </Grid>
+        </TabPanel>
+
+        <TabPanel value={tabValue} index={3}>
+          <Grid container spacing={3}>
+            {getFilteredEvaluations("completed").map(
+              (evaluation: Evaluation) => (
+                <Grid item xs={12} md={6} key={evaluation._id}>
+                  <EvaluationCard evaluation={evaluation} />
+                </Grid>
+              )
+            )}
           </Grid>
         </TabPanel>
       </Paper>
@@ -231,4 +286,4 @@ const MyEvaluations: React.FC = () => {
   );
 };
 
-export default MyEvaluations; 
+export default MyEvaluations;

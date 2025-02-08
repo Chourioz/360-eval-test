@@ -44,20 +44,62 @@ export interface Skill {
 // Evaluation Types
 export interface Evaluation {
   _id: string;
-  employee: Employee;
-  evaluationType: 'self' | 'peer' | 'manager' | '360';
+  employee: {
+    _id: string;
+    user: {
+      _id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+    position: string;
+    department: string;
+  };
+  evaluationType: 'self' | '360' | 'peer';
   period: {
     startDate: string;
     endDate: string;
   };
-  status: 'draft' | 'in_progress' | 'pending_review' | 'completed';
-  categories: EvaluationCategory[];
-  evaluators: Evaluator[];
+  status: 'draft' | 'in_progress' | 'completed';
+  categories: Array<{
+    name: string;
+    weight: number;
+    criteria: Array<{
+      description: string;
+      weight: number;
+      _id: string;
+    }>;
+    _id: string;
+  }>;
+  evaluators: Array<{
+    user: {
+      _id: string;
+      firstName: string;
+      lastName: string;
+      email: string;
+    };
+    status: 'pending' | 'in_progress' | 'completed';
+    feedback?: Array<{
+      categoryId: string;
+      criteriaId: string;
+      rating: number;
+      comment?: string;
+    }>;
+  }>;
   metadata: {
-    createdBy: User;
-    lastModifiedBy?: User;
-    template?: string;
+    createdBy: {
+      _id: string;
+      email: string;
+      firstName: string;
+      lastName: string;
+    };
+    lastModifiedBy: string;
   };
+  progress: number;
+  averageScore: number;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
 }
 
 export interface EvaluationCategory {

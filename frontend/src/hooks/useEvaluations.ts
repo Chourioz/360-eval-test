@@ -1,77 +1,79 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { evaluationService } from '@/services/evaluation.service';
-import type { Evaluation, ApiResponse } from '@/types';
+import type { Evaluation } from '@/types';
+
+interface EvaluationsResponse {
+  status: string;
+  results: number;
+  data: Evaluation[];
+}
 
 export function useEvaluations() {
   const queryClient = useQueryClient();
 
   const {
-    data: evaluations,
+    data: evaluationsData,
     isLoading,
     error
-  } = useQuery({
+  } = useQuery<EvaluationsResponse>({
     queryKey: ['evaluations'],
     queryFn: async () => {
       const response = await evaluationService.getEvaluations();
-      console.log("EVALUATIONS", JSON.stringify(response, null, 2));
-      return response.data;
-    }
+      return response;
+    },
+    select: (response) => response // Keep the full response structure
   });
 
-  const { mutate: createEvaluation, isPending: createLoading, error: createError } = useMutation({
+  const { mutate: createEvaluation, isPending: isCreating } = useMutation({
     mutationFn: evaluationService.createEvaluation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['evaluations'] });
     }
   });
 
-  const { mutate: updateEvaluation, isPending: updateLoading, error: updateError } = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof evaluationService.updateEvaluation>[1] }) =>
+  const { mutate: updateEvaluation, isPending: isUpdating } = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
       evaluationService.updateEvaluation(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['evaluations'] });
     }
   });
 
-  const { mutate: deleteEvaluation, isPending: deleteLoading, error: deleteError } = useMutation({
-    mutationFn: evaluationService.deleteEvaluation,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['evaluations'] });
-    }
-  });
-
-  const { mutate: startEvaluation, isPending: startLoading, error: startError } = useMutation({
+  const { mutate: startEvaluation, isPending: isStarting } = useMutation({
     mutationFn: evaluationService.startEvaluation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['evaluations'] });
     }
   });
 
-  const { mutate: completeEvaluation, isPending: completeLoading, error: completeError } = useMutation({
+  const { mutate: completeEvaluation, isPending: completeLoading } = useMutation({
     mutationFn: evaluationService.completeEvaluation,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['evaluations'] });
     }
   });
 
+  const { mutate: deleteEvaluation, isPending: deleteLoading } = useMutation({
+    mutationFn: evaluationService.deleteEvaluation,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['evaluations'] });
+    }
+  });
+
   return {
-    evaluations,
+    evaluations: evaluationsData?.data || [],
+    totalResults: evaluationsData?.results || 0,
     isLoading,
     error,
     createEvaluation,
-    createLoading,
-    createError,
+    isCreating,
     updateEvaluation,
-    updateLoading,
-    updateError,
-    deleteEvaluation,
-    deleteLoading,
-    deleteError,
+    isUpdating,
     startEvaluation,
-    startLoading,
-    startError,
+    isStarting,
     completeEvaluation,
     completeLoading,
-    completeError
+    deleteEvaluation,
+    deleteLoading
   };
 } 
