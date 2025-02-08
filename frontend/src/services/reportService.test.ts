@@ -17,9 +17,9 @@ jest.mock('jspdf-autotable', () => jest.fn());
 
 describe('ReportService', () => {
   const mockEmployee: Employee = {
-    id: '1',
+    _id: '1',
     user: {
-      id: '1',
+      _id: '1',
       email: 'test@example.com',
       firstName: 'John',
       lastName: 'Doe',
@@ -32,20 +32,17 @@ describe('ReportService', () => {
     department: 'IT',
     startDate: new Date().toISOString(),
     status: 'active',
-    skills: [
-      { name: 'JavaScript', level: 4 },
-      { name: 'React', level: 3 }
-    ],
+    skills: ['JavaScript', 'React'],
     directReports: [],
     metadata: {
       yearsOfExperience: 5,
-      previousPositions: ['Junior Developer'],
-      certifications: ['AWS Certified']
+      previousPositions: [{ title: 'Junior Developer', company: 'Tech Solutions', startDate: new Date().toISOString(), endDate: new Date().toISOString() }],
+      certifications: [{ name: 'AWS Certified', issuer: 'Amazon Web Services', date: new Date().toISOString(), expiryDate: new Date().toISOString() }]
     }
   };
 
   const mockEvaluation: Evaluation = {
-    id: '1',
+    _id: '1',
     employee: mockEmployee,
     evaluationType: '360',
     period: {
@@ -84,7 +81,7 @@ describe('ReportService', () => {
     evaluators: [
       {
         user: {
-          id: '2',
+          _id: '2',
           email: 'manager@example.com',
           firstName: 'Jane',
           lastName: 'Smith',
@@ -113,7 +110,7 @@ describe('ReportService', () => {
     ],
     metadata: {
       createdBy: {
-        id: '3',
+        _id: '3',
         email: 'admin@example.com',
         firstName: 'Admin',
         lastName: 'User',
@@ -123,7 +120,7 @@ describe('ReportService', () => {
         updatedAt: new Date().toISOString()
       },
       lastModifiedBy: {
-        id: '3',
+        _id: '3',
         email: 'admin@example.com',
         firstName: 'Admin',
         lastName: 'User',

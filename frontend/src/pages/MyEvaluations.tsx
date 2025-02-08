@@ -23,7 +23,8 @@ import {
 } from '@mui/icons-material';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from '@tanstack/react-router';
-
+import { useEvaluations } from '@/hooks/useEvaluations';
+import type { Evaluation } from '@/types';
 interface TabPanelProps {
   children?: React.ReactNode;
   index: number;
@@ -46,60 +47,23 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
-interface Evaluation {
-  id: string;
-  title: string;
-  type: string;
-  dueDate: string;
-  status: 'pending' | 'in_progress' | 'completed';
-  progress: number;
-  evaluator: string;
-}
-
-const mockEvaluations: Evaluation[] = [
-  {
-    id: '1',
-    title: 'Evaluación de Desempeño Q1 2024',
-    type: 'Evaluación 360°',
-    dueDate: '2024-03-31',
-    status: 'in_progress',
-    progress: 60,
-    evaluator: 'María García',
-  },
-  {
-    id: '2',
-    title: 'Autoevaluación Semestral',
-    type: 'Autoevaluación',
-    dueDate: '2024-06-30',
-    status: 'pending',
-    progress: 0,
-    evaluator: 'Auto',
-  },
-  {
-    id: '3',
-    title: 'Evaluación de Proyecto X',
-    type: 'Evaluación de Pares',
-    dueDate: '2024-02-28',
-    status: 'completed',
-    progress: 100,
-    evaluator: 'Carlos Rodríguez',
-  },
-];
-
 const statusColors = {
-  pending: 'warning',
+  draft: 'warning',
   in_progress: 'info',
+  pending_review: 'warning',
   completed: 'success',
 } as const;
 
 const statusLabels = {
-  pending: 'Pendiente',
+  draft: 'Borrador',
   in_progress: 'En Progreso',
+  pending_review: 'Pendiente de Revisión',
   completed: 'Completada',
 } as const;
 
 const MyEvaluations: React.FC = () => {
   const [tabValue, setTabValue] = React.useState(0);
+  const { evaluations, isLoading: evaluationsLoading, error: evaluationsError } = useEvaluations();
   const navigate = useNavigate();
   const { user, isLoading } = useAuth();
 
@@ -126,16 +90,13 @@ const MyEvaluations: React.FC = () => {
   };
 
   const getFilteredEvaluations = (status: 'pending' | 'in_progress' | 'completed') => {
-    return mockEvaluations.filter((evaluation) => evaluation.status === status);
+    return evaluations?.filter((evaluation) => evaluation.status === status) || [];
   };
 
   const EvaluationCard: React.FC<{ evaluation: Evaluation }> = ({ evaluation }) => (
     <Card>
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-          <Typography variant="h6" component="div">
-            {evaluation.title}
-          </Typography>
           <Chip
             label={statusLabels[evaluation.status]}
             color={statusColors[evaluation.status]}
@@ -147,14 +108,14 @@ const MyEvaluations: React.FC = () => {
           <Grid item xs={12} sm={6}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Assessment color="primary" />
-              <Typography variant="body2">{evaluation.type}</Typography>
+              <Typography variant="body2">{evaluation.evaluationType}</Typography>
             </Box>
           </Grid>
           <Grid item xs={12} sm={6}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Schedule color="primary" />
               <Typography variant="body2">
-                Fecha límite: {new Date(evaluation.dueDate).toLocaleDateString()}
+                Fecha límite: {new Date(evaluation.period.endDate).toLocaleDateString()}
               </Typography>
             </Box>
           </Grid>
@@ -162,7 +123,7 @@ const MyEvaluations: React.FC = () => {
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Person color="primary" />
               <Typography variant="body2">
-                Evaluador: {evaluation.evaluator}
+                Evaluador: {evaluation.evaluators.map(evaluator => evaluator.user.firstName).join(', ')}
               </Typography>
             </Box>
           </Grid>
@@ -192,7 +153,7 @@ const MyEvaluations: React.FC = () => {
           startIcon={<Assessment />}
           disabled={evaluation.status === 'completed'}
         >
-          {evaluation.status === 'pending'
+          {evaluation.status === 'draft'
             ? 'Comenzar Evaluación'
             : evaluation.status === 'in_progress'
             ? 'Continuar Evaluación'
@@ -239,7 +200,7 @@ const MyEvaluations: React.FC = () => {
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={3}>
             {getFilteredEvaluations('pending').map((evaluation) => (
-              <Grid item xs={12} md={6} key={evaluation.id}>
+              <Grid item xs={12} md={6} key={evaluation._id}>
                 <EvaluationCard evaluation={evaluation} />
               </Grid>
             ))}
@@ -249,7 +210,7 @@ const MyEvaluations: React.FC = () => {
         <TabPanel value={tabValue} index={1}>
           <Grid container spacing={3}>
             {getFilteredEvaluations('in_progress').map((evaluation) => (
-              <Grid item xs={12} md={6} key={evaluation.id}>
+              <Grid item xs={12} md={6} key={evaluation._id}>
                 <EvaluationCard evaluation={evaluation} />
               </Grid>
             ))}
@@ -259,7 +220,7 @@ const MyEvaluations: React.FC = () => {
         <TabPanel value={tabValue} index={2}>
           <Grid container spacing={3}>
             {getFilteredEvaluations('completed').map((evaluation) => (
-              <Grid item xs={12} md={6} key={evaluation.id}>
+              <Grid item xs={12} md={6} key={evaluation._id}>
                 <EvaluationCard evaluation={evaluation} />
               </Grid>
             ))}

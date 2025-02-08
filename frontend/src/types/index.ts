@@ -43,7 +43,7 @@ export interface Skill {
 
 // Evaluation Types
 export interface Evaluation {
-  id: string;
+  _id: string;
   employee: Employee;
   evaluationType: 'self' | 'peer' | 'manager' | '360';
   period: {

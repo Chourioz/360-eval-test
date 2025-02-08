@@ -6,6 +6,7 @@ const evaluationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Employee',
       required: [true, 'El empleado es requerido'],
+      autopopulate: true
     },
     evaluationType: {
       type: String,
@@ -24,7 +25,7 @@ const evaluationSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['draft', 'in_progress', 'completed'],
+      enum: ['draft', 'in_progress', 'pending_review', 'completed'],
       default: 'draft',
     },
     categories: [
@@ -70,29 +71,10 @@ const evaluationSchema = new mongoose.Schema(
         },
         status: {
           type: String,
-          enum: ['pending', 'in_progress', 'completed'],
+          enum: ['pending', 'completed'],
           default: 'pending',
         },
-        feedback: [
-          {
-            categoryId: {
-              type: mongoose.Schema.Types.ObjectId,
-              required: true,
-            },
-            criteriaId: {
-              type: mongoose.Schema.Types.ObjectId,
-              required: true,
-            },
-            score: {
-              type: Number,
-              min: 1,
-              max: 5,
-              required: true,
-            },
-            comment: String,
-          },
-        ],
-        submittedAt: Date,
+        completedAt: Date,
       },
     ],
     metadata: {
@@ -104,8 +86,8 @@ const evaluationSchema = new mongoose.Schema(
       lastModifiedBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
-        required: true,
       },
+      template: String
     },
   },
   {
@@ -118,17 +100,22 @@ const evaluationSchema = new mongoose.Schema(
 // Índices
 evaluationSchema.index({ employee: 1, status: 1 });
 evaluationSchema.index({ 'evaluators.user': 1, status: 1 });
+evaluationSchema.index({ 'period.startDate': 1, 'period.endDate': 1 });
 evaluationSchema.index({ 'metadata.createdBy': 1 });
 
 // Virtual para calcular el progreso general
 evaluationSchema.virtual('progress').get(function () {
-  if (!this.evaluators || this.evaluators.length === 0) return 0;
-  
+  if (this.status === 'draft') return 0;
+  if (this.status === 'completed') return 100;
+
+  const totalEvaluators = this.evaluators.length;
+  if (totalEvaluators === 0) return 0;
+
   const completedEvaluators = this.evaluators.filter(
     (e) => e.status === 'completed'
   ).length;
   
-  return Math.round((completedEvaluators / this.evaluators.length) * 100);
+  return Math.round((completedEvaluators / totalEvaluators) * 100);
 });
 
 // Virtual para calcular el puntaje promedio
@@ -171,6 +158,44 @@ evaluationSchema.pre('save', function (next) {
   }
   next();
 });
+
+// Middleware para poblar referencias automáticamente
+evaluationSchema.pre(/^find/, function(next) {
+  this.populate('employee')
+      .populate('evaluators.user', 'firstName lastName email')
+      .populate('metadata.createdBy', 'firstName lastName')
+      .populate('metadata.lastModifiedBy', 'firstName lastName');
+  next();
+});
+
+// Método para iniciar la evaluación
+evaluationSchema.methods.start = function() {
+  if (this.status !== 'draft') {
+    throw new Error('Solo se pueden iniciar evaluaciones en estado draft');
+  }
+  this.status = 'in_progress';
+  return this.save();
+};
+
+// Método para completar la evaluación
+evaluationSchema.methods.complete = function() {
+  if (this.status !== 'in_progress' && this.status !== 'pending_review') {
+    throw new Error('Solo se pueden completar evaluaciones en progreso o pendientes de revisión');
+  }
+  this.status = 'completed';
+  return this.save();
+};
+
+// Método para marcar un evaluador como completado
+evaluationSchema.methods.markEvaluatorAsCompleted = function(userId) {
+  const evaluator = this.evaluators.find(e => e.user.toString() === userId.toString());
+  if (!evaluator) {
+    throw new Error('Evaluador no encontrado');
+  }
+  evaluator.status = 'completed';
+  evaluator.completedAt = new Date();
+  return this.save();
+};
 
 const Evaluation = mongoose.model('Evaluation', evaluationSchema);
 

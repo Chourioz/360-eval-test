@@ -1,313 +1,275 @@
 import React from 'react';
 import {
   Box,
-  Paper,
-  Typography,
   Button,
+  Card,
+  CardContent,
+  Chip,
+  CircularProgress,
+  Container,
+  IconButton,
+  Paper,
+  Stack,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
-  TableRow,
   TablePagination,
-  Chip,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  MenuItem,
-  Grid,
-  CircularProgress,
+  TableRow,
+  Typography,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
-import {
-  Add as AddIcon,
-  Edit as EditIcon,
-  PictureAsPdf,
-} from '@mui/icons-material';
-import ReportGenerator from '@/components/reports/ReportGenerator';
-import type { Evaluation as EvaluationType } from '@/types';
-import { useNavigate } from '@tanstack/react-router';
-import { useAuth } from '@/hooks/useAuth';
-
-interface Evaluation extends EvaluationType {}
-
-type StatusType = 'draft' | 'in_progress' | 'pending_review' | 'completed';
-type ColorType = 'warning' | 'info' | 'success';
-
-const mockEvaluations: Evaluation[] = [
-  {
-    id: '1',
-    evaluationType: '360',
-    employee: {
-      id: '1',
-      user: {
-        id: '1',
-        firstName: 'John',
-        lastName: 'Doe',
-        email: 'john@example.com',
-        role: 'employee',
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01'
-      },
-      position: 'Developer',
-      department: 'Engineering',
-      startDate: '2024-01-01',
-      status: 'active',
-      directReports: [],
-      skills: [],
-      metadata: {
-        yearsOfExperience: 5,
-        previousPositions: [],
-        certifications: []
-      }
-    },
-    period: {
-      startDate: '2024-01-01',
-      endDate: '2024-03-31'
-    },
-    status: 'in_progress',
-    categories: [],
-    evaluators: [],
-    metadata: {
-      createdBy: {
-        id: '2',
-        firstName: 'Jane',
-        lastName: 'Smith',
-        email: 'jane@example.com',
-        role: 'manager',
-        isActive: true,
-        createdAt: '2024-01-01',
-        updatedAt: '2024-01-01'
-      }
-    }
-  }
-];
-
-const typeLabels: Record<Evaluation['evaluationType'], string> = {
-  '360': 'Evaluación 360°',
-  self: 'Autoevaluación',
-  peer: 'Evaluación de Pares',
-  manager: 'Evaluación de Gerente'
-};
-
-const statusLabels: Record<StatusType, string> = {
-  draft: 'Borrador',
-  in_progress: 'En Progreso',
-  pending_review: 'Pendiente de Revisión',
-  completed: 'Completado'
-};
-
-const statusColors: Record<StatusType, ColorType> = {
-  draft: 'warning',
-  in_progress: 'info',
-  pending_review: 'warning',
-  completed: 'success'
-};
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { useEmployees } from '@/hooks/useEmployees';
+import { useEvaluations } from '@/hooks/useEvaluations';
+import EvaluationForm from '@/components/evaluations/EvaluationForm';
+import type { Evaluation } from '@/types';
 
 const Evaluations: React.FC = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [openDialog, setOpenDialog] = React.useState(false);
-  const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | null>(null);
-  const [isReportDialogOpen, setIsReportDialogOpen] = React.useState(false);
-  const navigate = useNavigate();
-  const { user, isLoading } = useAuth();
+  const [rowsPerPage, setRowsPerPage] = React.useState(10);
+  const [openForm, setOpenForm] = React.useState(false);
+  const [selectedEvaluation, setSelectedEvaluation] = React.useState<Evaluation | undefined>();
+
+  const { employees } = useEmployees();
+  const {
+    evaluations,
+    isLoading,
+    error,
+    createEvaluation,
+    updateEvaluation,
+    deleteEvaluation,
+    isCreating,
+    isUpdating,
+    isDeleting,
+  } = useEvaluations();
+
+  const handleChangePage = (_: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
+  const handleOpenCreate = () => {
+    setSelectedEvaluation(undefined);
+    setOpenForm(true);
+  };
+
+  const handleOpenEdit = (evaluation: Evaluation) => {
+    setSelectedEvaluation(evaluation);
+    setOpenForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setOpenForm(false);
+    setSelectedEvaluation(undefined);
+  };
+
+  const handleSubmit = async (data: any) => {
+    try {
+      if (selectedEvaluation) {
+        await updateEvaluation({ id: selectedEvaluation._id, data });
+      } else {
+        await createEvaluation(data);
+      }
+      handleCloseForm();
+    } catch (error) {
+      console.error('Error submitting evaluation:', error);
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    if (window.confirm('¿Está seguro de que desea eliminar esta evaluación?')) {
+      try {
+        await deleteEvaluation(id);
+      } catch (error) {
+        console.error('Error deleting evaluation:', error);
+      }
+    }
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return 'default';
+      case 'in_progress':
+        return 'primary';
+      case 'completed':
+        return 'success';
+      default:
+        return 'default';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'draft':
+        return 'Borrador';
+      case 'in_progress':
+        return 'En Progreso';
+      case 'completed':
+        return 'Completada';
+      default:
+        return status;
+    }
+  };
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
         <CircularProgress />
       </Box>
     );
   }
 
-  if (!user) {
-    navigate({ to: '/login' });
-    return null;
+  if (error) {
+    return (
+      <Box p={3}>
+        <Typography color="error">Error: {error.message}</Typography>
+      </Box>
+    );
   }
-
-  if (!['admin', 'manager'].includes(user.role)) {
-    navigate({ to: '/unauthorized' });
-    return null;
-  }
-
-  const handleChangePage = (event: unknown, newPage: number) => {
-    setPage(newPage);
-  };
-
-  const handleChangeRowsPerPage = (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
-    setPage(0);
-  };
-
-  const handleOpenDialog = (evaluation?: Evaluation) => {
-    if (evaluation) {
-      setSelectedEvaluation(evaluation);
-    } else {
-      setSelectedEvaluation(null);
-    }
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedEvaluation(null);
-  };
-
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    // TODO: Implementar la lógica para guardar la evaluación
-    console.log('Guardando evaluación:', selectedEvaluation);
-    handleCloseDialog();
-  };
-
-  const handleGenerateReport = (evaluation: Evaluation) => {
-    setSelectedEvaluation(evaluation);
-    setIsReportDialogOpen(true);
-  };
 
   return (
-    <>
-      <Box>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-          <Typography variant="h4">Evaluaciones</Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-          >
-            Nueva Evaluación
-          </Button>
-        </Box>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Stack
+        direction={isMobile ? 'column' : 'row'}
+        justifyContent="space-between"
+        alignItems={isMobile ? 'stretch' : 'center'}
+        spacing={2}
+        mb={4}
+      >
+        <Typography variant="h4" component="h1">
+          Evaluaciones
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={handleOpenCreate}
+          fullWidth={isMobile}
+        >
+          Nueva Evaluación
+        </Button>
+      </Stack>
 
-        <Paper>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Empleado</TableCell>
-                  <TableCell>Tipo</TableCell>
-                  <TableCell>Estado</TableCell>
-                  <TableCell>Fecha Límite</TableCell>
-                  <TableCell align="right">Acciones</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {mockEvaluations.map((evaluation) => (
-                  <TableRow key={evaluation.id}>
-                    <TableCell>{evaluation.employee.user.firstName} {evaluation.employee.user.lastName}</TableCell>
-                    <TableCell>{typeLabels[evaluation.evaluationType]}</TableCell>
+      <Paper>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Empleado</TableCell>
+                {!isMobile && <TableCell>Tipo</TableCell>}
+                <TableCell>Estado</TableCell>
+                {!isMobile && <TableCell>Progreso</TableCell>}
+                <TableCell align="right">Acciones</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {(evaluations || [])
+                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                .map((evaluation) => (
+                  <TableRow key={evaluation._id}>
+                    <TableCell>
+                      <Stack>
+                        <Typography variant="body1">
+                          {evaluation.employee.user.firstName} {evaluation.employee.user.lastName}
+                        </Typography>
+                        {isMobile && (
+                          <Typography variant="caption" color="textSecondary">
+                            {evaluation.evaluationType === 'self'
+                              ? 'Auto-evaluación'
+                              : evaluation.evaluationType === 'peer'
+                              ? 'Entre pares'
+                              : evaluation.evaluationType === 'manager'
+                              ? 'Por supervisor'
+                              : '360°'}
+                          </Typography>
+                        )}
+                      </Stack>
+                    </TableCell>
+                    {!isMobile && (
+                      <TableCell>
+                        {evaluation.evaluationType === 'self'
+                          ? 'Auto-evaluación'
+                          : evaluation.evaluationType === 'peer'
+                          ? 'Entre pares'
+                          : evaluation.evaluationType === 'manager'
+                          ? 'Por supervisor'
+                          : '360°'}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <Chip
-                        label={statusLabels[evaluation.status]}
-                        color={statusColors[evaluation.status]}
-                        size="small"
+                        label={getStatusLabel(evaluation.status)}
+                        color={getStatusColor(evaluation.status) as any}
+                        size={isMobile ? 'small' : 'medium'}
                       />
                     </TableCell>
-                    <TableCell>{new Date(evaluation.period.endDate).toLocaleDateString()}</TableCell>
+                    {!isMobile && (
+                      <TableCell>
+                        <Box display="flex" alignItems="center">
+                          <CircularProgress
+                            variant="determinate"
+                            value={evaluation.progress || 0}
+                            size={24}
+                            sx={{ mr: 1 }}
+                          />
+                          <Typography variant="body2">{evaluation.progress || 0}%</Typography>
+                        </Box>
+                      </TableCell>
+                    )}
                     <TableCell align="right">
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpenDialog(evaluation)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleGenerateReport(evaluation)}
-                      >
-                        <PictureAsPdf />
-                      </IconButton>
+                      <Stack direction="row" spacing={1} justifyContent="flex-end">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleOpenEdit(evaluation)}
+                          disabled={isUpdating}
+                        >
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={() => handleDelete(evaluation._id)}
+                          disabled={isDeleting}
+                          color="error"
+                        >
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Stack>
                     </TableCell>
                   </TableRow>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-          <TablePagination
-            rowsPerPageOptions={[5, 10, 25]}
-            component="div"
-            count={mockEvaluations.length}
-            rowsPerPage={rowsPerPage}
-            page={page}
-            onPageChange={handleChangePage}
-            onRowsPerPageChange={handleChangeRowsPerPage}
-          />
-        </Paper>
-      </Box>
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          component="div"
+          count={evaluations?.length || 0}
+          page={page}
+          onPageChange={handleChangePage}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage={isMobile ? 'Filas:' : 'Filas por página:'}
+        />
+      </Paper>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="md" fullWidth>
-        <form onSubmit={handleSubmit}>
-          <DialogTitle>
-            {selectedEvaluation ? 'Editar Evaluación' : 'Nueva Evaluación'}
-          </DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2}>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Empleado"
-                  defaultValue={selectedEvaluation?.employee.user.firstName + ' ' + selectedEvaluation?.employee.user.lastName}
-                  disabled
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Tipo de Evaluación"
-                  select
-                  defaultValue={selectedEvaluation?.evaluationType || '360'}
-                  required
-                >
-                  <MenuItem value="360">Evaluación 360°</MenuItem>
-                  <MenuItem value="self">Autoevaluación</MenuItem>
-                  <MenuItem value="peer">Evaluación de Pares</MenuItem>
-                  <MenuItem value="manager">Evaluación de Gerente</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="Fecha de Inicio"
-                  defaultValue={selectedEvaluation?.period.startDate}
-                  InputLabelProps={{ shrink: true }}
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  type="date"
-                  label="Fecha de Fin"
-                  defaultValue={selectedEvaluation?.period.endDate}
-                  InputLabelProps={{ shrink: true }}
-                  required
-                />
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseDialog}>Cancelar</Button>
-            <Button type="submit" variant="contained">
-              Guardar
-            </Button>
-          </DialogActions>
-        </form>
-      </Dialog>
-
-      <ReportGenerator
-        open={isReportDialogOpen}
-        onClose={() => setIsReportDialogOpen(false)}
+      <EvaluationForm
+        open={openForm}
+        onClose={handleCloseForm}
+        onSubmit={handleSubmit}
         evaluation={selectedEvaluation}
+        employees={employees}
+        isLoading={isCreating || isUpdating}
+        mode={selectedEvaluation ? 'edit' : 'create'}
       />
-    </>
+    </Container>
   );
 };
 

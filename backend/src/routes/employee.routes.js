@@ -18,6 +18,7 @@ router.get('/', restrictTo('admin', 'manager'), async (req, res, next) => {
     logger.debug('Checking cache for key:', cacheKey);
     
     let employees = null;
+    
     if (cacheService.isConnected) {
       employees = await cacheService.get(cacheKey);
       if (employees) {
@@ -40,31 +41,32 @@ router.get('/', restrictTo('admin', 'manager'), async (req, res, next) => {
         select: '-password'
       })
       .lean();
-    
-    // Store in cache if Redis is connected
+
+    // Store in cache if available
     if (cacheService.isConnected) {
-      logger.debug('Storing employees list in cache');
       await cacheService.set(cacheKey, employees, 300); // Cache for 5 minutes
+      logger.debug('Stored employees list in cache');
     }
 
     res.status(200).json({
       status: 'success',
       data: employees,
-      source: 'database'
+      source: 'db'
     });
   } catch (error) {
     logger.error('Error fetching employees:', error);
-    next(new AppError('Error fetching employees', 500));
+    next(error);
   }
 });
 
-// Get employee by ID
+// Get single employee
 router.get('/:id', restrictTo('admin', 'manager'), async (req, res, next) => {
   try {
     const employee = await Employee.findById(req.params.id)
-      .populate('user', '-password')
-      .populate('manager', 'position department')
-      .populate('directReports', 'position department');
+      .populate({
+        path: 'user',
+        select: '-password'
+      });
 
     if (!employee) {
       return next(new AppError('Employee not found', 404));
@@ -76,79 +78,131 @@ router.get('/:id', restrictTo('admin', 'manager'), async (req, res, next) => {
     });
   } catch (error) {
     logger.error('Error fetching employee:', error);
-    next(new AppError('Error fetching employee', 500));
+    next(error);
   }
 });
 
 // Create new employee
 router.post('/', restrictTo('admin'), async (req, res, next) => {
   try {
-    const { firstName, lastName, email, position, department, role = 'employee', status = 'active' } = req.body;
-
-    // 1. Create the user first
-    const user = new User({
+    const {
       email,
       firstName,
       lastName,
+      position,
+      department,
+      role = 'employee',
+      status = 'active'
+    } = req.body;
+
+    // Check if user with email already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return next(new AppError('Email already in use', 400));
+    }
+
+    // Generate a temporary password
+    const tempPassword = Math.random().toString(36).slice(-8);
+
+    // Create user first
+    const user = await User.create({
+      email,
+      password: tempPassword,
+      firstName,
+      lastName,
       role,
-      isActive: status === 'active',
-      // Generate a temporary password that will need to be changed on first login
-      password: Math.random().toString(36).slice(-8)
+      isActive: status === 'active'
     });
 
-    await user.save();
-
-    // 2. Create the employee with the new user's ID
-    const employee = new Employee({
+    // Create employee
+    const employee = await Employee.create({
       user: user._id,
       position,
       department,
-      startDate: new Date(),
-      status: status || 'active'
+      status,
+      startDate: new Date()
     });
-    
-    await employee.save();
-    
-    // 3. Get the populated employee data
-    const populatedEmployee = await Employee.findById(employee._id)
-      .populate({
-        path: 'user',
-        select: '-password'
-      });
 
-    // 4. Clear the cache if it exists
+    // Populate user data (excluding password)
+    await employee.populate({
+      path: 'user',
+      select: '-password'
+    });
+
+    // Clear employees cache
     if (cacheService.isConnected) {
       await cacheService.delete('employees:all');
     }
 
     res.status(201).json({
       status: 'success',
-      data: populatedEmployee,
-      message: `Employee created successfully. Temporary password: ${user.password}`
+      data: {
+        employee,
+        tempPassword // Include temporary password in response
+      }
     });
   } catch (error) {
     logger.error('Error creating employee:', error);
-    // If user was created but employee creation failed, delete the user
-    if (error.user) {
-      await User.findByIdAndDelete(error.user._id);
-    }
-    next(new AppError(error.message || 'Error creating employee', 400));
+    next(error);
   }
 });
 
 // Update employee
 router.patch('/:id', restrictTo('admin'), async (req, res, next) => {
   try {
-    const employee = await Employee.findByIdAndUpdate(
-      req.params.id,
-      { $set: req.body },
-      { new: true, runValidators: true }
-    )
-      .populate('user', '-password')
-      .populate('manager', 'position department');
-    
+    const { id } = req.params;
+    const {
+      email,
+      firstName,
+      lastName,
+      position,
+      department,
+      role,
+      status
+    } = req.body;
+
+    // Find employee and associated user
+    const employee = await Employee.findById(id);
     if (!employee) {
       return next(new AppError('Employee not found', 404));
+    }
+
+    const user = await User.findById(employee.user);
+    if (!user) {
+      return next(new AppError('Associated user not found', 404));
+    }
+
+    // Check if email is being changed and if it's already in use
+    if (email && email !== user.email) {
+      const existingUser = await User.findOne({ email });
+      if (existingUser) {
+        return next(new AppError('Email already in use', 400));
+      }
+    }
+
+    // Update user data
+    if (email) user.email = email;
+    if (firstName) user.firstName = firstName;
+    if (lastName) user.lastName = lastName;
+    if (role) user.role = role;
+    if (status) user.isActive = status === 'active';
+    await user.save();
+
+    // Update employee data
+    if (position) employee.position = position;
+    if (department) employee.department = department;
+    if (status) employee.status = status;
+    await employee.save();
+
+    // Populate updated employee data
+    await employee.populate({
+      path: 'user',
+      select: '-password'
+    });
+
+    // Clear cache
+    if (cacheService.isConnected) {
+      await cacheService.delete('employees:all');
     }
 
     res.status(200).json({
@@ -157,7 +211,7 @@ router.patch('/:id', restrictTo('admin'), async (req, res, next) => {
     });
   } catch (error) {
     logger.error('Error updating employee:', error);
-    next(new AppError('Error updating employee', 400));
+    next(error);
   }
 });
 
@@ -165,25 +219,28 @@ router.patch('/:id', restrictTo('admin'), async (req, res, next) => {
 router.delete('/:id', restrictTo('admin'), async (req, res, next) => {
   try {
     const employee = await Employee.findById(req.params.id);
-    
     if (!employee) {
       return next(new AppError('Employee not found', 404));
     }
 
-    // Check if employee has direct reports
-    if (employee.directReports && employee.directReports.length > 0) {
-      return next(new AppError('Cannot delete employee with direct reports', 400));
-    }
+    // Delete associated user
+    await User.findByIdAndDelete(employee.user);
 
+    // Delete employee
     await Employee.findByIdAndDelete(req.params.id);
 
-    res.status(200).json({
+    // Clear cache
+    if (cacheService.isConnected) {
+      await cacheService.delete('employees:all');
+    }
+
+    res.status(204).json({
       status: 'success',
-      message: 'Employee deleted successfully'
+      data: null
     });
   } catch (error) {
     logger.error('Error deleting employee:', error);
-    next(new AppError('Error deleting employee', 500));
+    next(error);
   }
 });
 

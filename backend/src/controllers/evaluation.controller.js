@@ -60,41 +60,72 @@ exports.createEvaluation = async (req, res, next) => {
 // Obtener todas las evaluaciones
 exports.getAllEvaluations = async (req, res, next) => {
   try {
-    const { status, type, employee } = req.query;
-    const cacheKey = cacheService.generateListKey('evaluations', JSON.stringify(req.query));
+    const cacheKey = cacheService.generateListKey('evaluations');
     
     // Intentar obtener de caché
-    const cachedEvaluations = await cacheService.get(cacheKey);
-    if (cachedEvaluations) {
-      logger.debug('Cache hit for evaluations list');
-      return res.json({
-        status: 'success',
-        data: cachedEvaluations
-      });
-    }
+    // const cachedEvaluations = await cacheService.get(cacheKey);
+    // if (cachedEvaluations) {
+    //   logger.debug('Cache hit for evaluations list');
+    //   return res.json({
+    //     status: 'success',
+    //     data: cachedEvaluations
+    //   });
+    // }
 
-    // Construir query
-    const query = {};
-    if (status) query.status = status;
-    if (type) query.evaluationType = type;
-    if (employee) query.employee = employee;
-
-    const evaluations = await Evaluation.find(query)
-      .populate('employee', 'firstName lastName position department')
+    // Modified population configuration
+    let query = Evaluation.find()
+      .populate({
+        path: 'employee',
+        select: 'position department user', // Explicitly select fields
+        populate: {
+          path: 'user',
+          select: 'firstName lastName' // Populate user details for virtual
+        }
+      })
       .populate('evaluators.user', 'firstName lastName email')
-      .populate('metadata.createdBy', 'firstName lastName')
-      .sort('-createdAt');
+      .populate('metadata.createdBy', 'firstName lastName');
+
+    // Filtrar según el rol del usuario
+    if (req.user.role === 'employee') {
+      // Empleados solo ven sus propias evaluaciones y aquellas donde son evaluadores
+      query = query.or([
+        { employee: req.user.id },
+        { 'evaluators.user': req.user.id }
+      ]);
+    } else if (req.user.role === 'manager') {
+      // Managers ven las evaluaciones de sus empleados y las propias
+      const managedEmployees = await Employee.find({ manager: req.user.id }).select('_id');
+      const managedEmployeeIds = managedEmployees.map(emp => emp._id);
+      
+      query = query.or([
+        { employee: { $in: managedEmployeeIds } },
+        { employee: req.user.id },
+        { 'evaluators.user': req.user.id }
+      ]);
+    }
+    // Los admin ven todas las evaluaciones
+
+    const evaluations = await query.lean().exec(); // Use lean() for better performance
+
+    // Transform results to include fullName
+    const transformedEvaluations = evaluations.map(evaluation => ({
+      ...evaluation,
+      employee: {
+        ...evaluation.employee,
+        fullName: evaluation.employee.user 
+          ? `${evaluation.employee.user.firstName} ${evaluation.employee.user.lastName}`
+          : ''
+      }
+    }));
 
     // Guardar en caché
-    await cacheService.set(cacheKey, evaluations, 1800); // TTL de 30 minutos
+    await cacheService.set(cacheKey, transformedEvaluations);
     logger.debug('Cache set for evaluations list');
 
     res.status(200).json({
       status: 'success',
-      results: evaluations.length,
-      data: {
-        evaluations
-      }
+      results: transformedEvaluations.length,
+      data: transformedEvaluations
     });
   } catch (error) {
     logger.error('Error al obtener evaluaciones:', error);
@@ -266,7 +297,7 @@ exports.startEvaluation = async (req, res, next) => {
   }
 };
 
-// Finalizar una evaluación
+// Completar una evaluación
 exports.completeEvaluation = async (req, res, next) => {
   try {
     const evaluation = await Evaluation.findById(req.params.id);
@@ -279,17 +310,25 @@ exports.completeEvaluation = async (req, res, next) => {
       return next(new AppError('La evaluación no está en progreso', 400));
     }
 
-    // Verificar que todos los evaluadores han completado su feedback
-    const allCompleted = evaluation.evaluators.every(e => e.status === 'completed');
-    if (!allCompleted) {
-      return next(new AppError('No todos los evaluadores han completado su feedback', 400));
+    // Verificar que todos los evaluadores hayan completado su feedback
+    const pendingEvaluators = evaluation.evaluators.filter(e => e.status !== 'completed');
+    if (pendingEvaluators.length > 0) {
+      return next(new AppError('Hay evaluadores pendientes de completar su feedback', 400));
     }
 
     evaluation.status = 'completed';
     evaluation.metadata.lastModifiedBy = req.user.id;
     await evaluation.save();
 
-    // TODO: Enviar notificaciones de finalización
+    // Invalidar cachés
+    const cacheKey = cacheService.generateKey('evaluation', req.params.id);
+    await Promise.all([
+      cacheService.delete(cacheKey),
+      cacheService.delete(cacheService.generateListKey('evaluations'))
+    ]);
+
+    // Notificar al empleado y a su manager
+    // TODO: Implementar notificaciones
 
     res.status(200).json({
       status: 'success',
