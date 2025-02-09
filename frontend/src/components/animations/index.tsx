@@ -74,7 +74,7 @@ export const tabVariants = {
 };
 
 // Componente de tabla animada
-export const AnimatedTable = motion.div;
+export const AnimatedTable = motion.table;
 
 // Componente de fila de tabla animada
 export const AnimatedTableRow = motion.tr;

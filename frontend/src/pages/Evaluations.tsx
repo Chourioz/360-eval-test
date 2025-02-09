@@ -2,15 +2,12 @@ import React from 'react';
 import {
   Box,
   Button,
-  Card as MuiCard,
-  CardContent,
   Chip,
   CircularProgress,
   Container,
   IconButton,
   Paper as MuiPaper,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableContainer,
@@ -28,16 +25,19 @@ import EvaluationForm from '@/components/evaluations/EvaluationForm';
 import type { Evaluation } from '@/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  staggeredListVariants, 
-  tableRowVariants,
+  staggeredListVariants,
   cardVariants,
   FadeIn,
   AnimatedTable,
-  AnimatedTableRow
 } from '@/components/animations';
 
-const Card = motion(MuiCard);
 const Paper = motion(MuiPaper);
+
+
+const tableRowVariants = {
+  hidden: { opacity: 0, x: -20 },
+  visible: { opacity: 1, x: 0 }
+};
 
 const Evaluations: React.FC = () => {
   const theme = useTheme();
@@ -77,58 +77,6 @@ const Evaluations: React.FC = () => {
   const handleCloseForm = () => {
     setSelectedEvaluation(undefined);
     setOpenForm(false);
-  };
-
-  const handleSubmit = async (data: any) => {
-    try {
-      if (selectedEvaluation) {
-        await updateEvaluation({ 
-          id: selectedEvaluation._id, 
-          data 
-        });
-      } else {
-        await createEvaluation(data);
-      }
-      handleCloseForm();
-    } catch (error) {
-      console.error('Error submitting evaluation:', error);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (window.confirm('¿Está seguro de que desea eliminar esta evaluación?')) {
-      try {
-        await deleteEvaluation(id);
-      } catch (error) {
-        console.error('Error deleting evaluation:', error);
-      }
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'default';
-      case 'in_progress':
-        return 'primary';
-      case 'completed':
-        return 'success';
-      default:
-        return 'default';
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'draft':
-        return 'Borrador';
-      case 'in_progress':
-        return 'En Progreso';
-      case 'completed':
-        return 'Completada';
-      default:
-        return status;
-    }
   };
 
   if (isLoading) {
@@ -193,13 +141,11 @@ const Evaluations: React.FC = () => {
                 {evaluations
                   ?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                   .map((evaluation) => (
-                    <AnimatedTableRow
+                    <motion.tr
                       key={evaluation._id}
                       variants={tableRowVariants}
                       initial="hidden"
                       animate="visible"
-                      exit="hidden"
-                      whileHover="hover"
                     >
                       <TableCell>
                         {evaluation.employee?.user?.firstName} {evaluation.employee?.user?.lastName}
@@ -247,7 +193,7 @@ const Evaluations: React.FC = () => {
                           </IconButton>
                         </Stack>
                       </TableCell>
-                    </AnimatedTableRow>
+                    </motion.tr>
                   ))}
               </AnimatePresence>
             </TableBody>
