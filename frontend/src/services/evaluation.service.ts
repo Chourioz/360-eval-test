@@ -26,6 +26,19 @@ interface CreateEvaluationData {
 
 interface UpdateEvaluationData extends Partial<CreateEvaluationData> {}
 
+export interface PendingEvaluation {
+  id: string;
+  evaluationType: string;
+  evaluee: {
+    name: string;
+    position: string;
+    department: string;
+  };
+  dueDate: string;
+  progress: number;
+  status: 'draft' | 'in_progress' | 'pending_review';
+}
+
 class EvaluationService {
   async getEvaluations() {
     const response = await api.get<{
@@ -81,6 +94,10 @@ class EvaluationService {
       { responses }
     );
     return response.data;
+  }
+
+  async getPendingEvaluations(): Promise<ApiResponse<PendingEvaluation[]>> {
+    return api.get<PendingEvaluation[]>('/evaluations/pending');
   }
 }
 

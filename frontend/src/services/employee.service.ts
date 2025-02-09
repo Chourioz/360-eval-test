@@ -18,6 +18,21 @@ interface CreateEmployeeResponse {
   tempPassword: string;
 }
 
+interface DashboardStats {
+  pendingEvaluations: number;
+  monthlyFeedback: number;
+  averageScore: string;
+  teamCount: number;
+  performanceData: Array<{
+    month: string;
+    score: number;
+  }>;
+  feedbackDistribution: Array<{
+    name: string;
+    value: number;
+  }>;
+}
+
 class EmployeeService {
   async getEmployees(): Promise<ApiResponse<Employee[]>> {
     return apiService.get('/employees');
@@ -37,6 +52,10 @@ class EmployeeService {
 
   async deleteEmployee(id: string): Promise<ApiResponse<void>> {
     return apiService.delete(`/employees/${id}`);
+  }
+
+  async getDashboardStats(): Promise<ApiResponse<DashboardStats>> {
+    return apiService.get('/employees/me/dashboard');
   }
 }
 

@@ -2,13 +2,13 @@ import React from 'react';
 import {
   Box,
   Button,
-  Card,
+  Card as MuiCard,
   CardContent,
   Chip,
   CircularProgress,
   Container,
   IconButton,
-  Paper,
+  Paper as MuiPaper,
   Stack,
   Table,
   TableBody,
@@ -26,6 +26,18 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { useEvaluations } from '@/hooks/useEvaluations';
 import EvaluationForm from '@/components/evaluations/EvaluationForm';
 import type { Evaluation } from '@/types';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  staggeredListVariants, 
+  tableRowVariants,
+  cardVariants,
+  FadeIn,
+  AnimatedTable,
+  AnimatedTableRow
+} from '@/components/animations';
+
+const Card = motion(MuiCard);
+const Paper = motion(MuiPaper);
 
 const Evaluations: React.FC = () => {
   const theme = useTheme();
@@ -45,10 +57,10 @@ const Evaluations: React.FC = () => {
     deleteEvaluation,
     isCreating,
     isUpdating,
-    isDeleting,
+    deleteLoading: isDeleting
   } = useEvaluations();
 
-  const handleChangePage = (_: unknown, newPage: number) => {
+  const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
@@ -57,19 +69,14 @@ const Evaluations: React.FC = () => {
     setPage(0);
   };
 
-  const handleOpenCreate = () => {
-    setSelectedEvaluation(undefined);
-    setOpenForm(true);
-  };
-
-  const handleOpenEdit = (evaluation: Evaluation) => {
+  const handleOpenForm = (evaluation?: Evaluation) => {
     setSelectedEvaluation(evaluation);
     setOpenForm(true);
   };
 
   const handleCloseForm = () => {
-    setOpenForm(false);
     setSelectedEvaluation(undefined);
+    setOpenForm(false);
   };
 
   const handleSubmit = async (data: any) => {
@@ -126,7 +133,7 @@ const Evaluations: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="200px">
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
         <CircularProgress />
       </Box>
     );
@@ -141,134 +148,128 @@ const Evaluations: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg" sx={{ py: 4 }}>
-      <Stack
-        direction={isMobile ? 'column' : 'row'}
-        justifyContent="space-between"
-        alignItems={isMobile ? 'stretch' : 'center'}
-        spacing={2}
-        mb={4}
-      >
-        <Typography variant="h4" component="h1">
-          Evaluaciones
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={handleOpenCreate}
-          fullWidth={isMobile}
-        >
-          Nueva Evaluación
-        </Button>
-      </Stack>
+    <Container maxWidth="xl">
+      <FadeIn>
+        <Box sx={{ mb: 4 }}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Typography variant="h4">Evaluaciones</Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => handleOpenForm()}
+              disabled={isCreating}
+            >
+              Nueva Evaluación
+            </Button>
+          </Stack>
+        </Box>
+      </FadeIn>
 
-      <Paper>
+      <Paper
+        variants={cardVariants}
+        initial="initial"
+        animate="animate"
+        whileHover="hover"
+      >
         <TableContainer>
-          <Table>
+          <AnimatedTable
+            variants={staggeredListVariants}
+            initial="hidden"
+            animate="visible"
+          >
             <TableHead>
               <TableRow>
                 <TableCell>Empleado</TableCell>
-                {!isMobile && <TableCell>Tipo</TableCell>}
+                <TableCell>Tipo</TableCell>
                 <TableCell>Estado</TableCell>
-                {!isMobile && <TableCell>Progreso</TableCell>}
+                <TableCell>Progreso</TableCell>
+                {!isMobile && <TableCell>Fecha Inicio</TableCell>}
+                {!isMobile && <TableCell>Fecha Fin</TableCell>}
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
-              {(evaluations || [])
-                .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                .map((evaluation) => (
-                  <TableRow key={evaluation._id}>
-                    <TableCell>
-                      <Stack>
-                        <Typography variant="body1">
-                          {evaluation.employee.user.firstName} {evaluation.employee.user.lastName}
-                        </Typography>
-                        {isMobile && (
-                          <Typography variant="caption" color="textSecondary">
-                            {evaluation.evaluationType === 'self'
-                              ? 'Auto-evaluación'
-                              : evaluation.evaluationType === 'peer'
-                              ? 'Entre pares'
-                              : evaluation.evaluationType === 'manager'
-                              ? 'Por supervisor'
-                              : '360°'}
-                          </Typography>
-                        )}
-                      </Stack>
-                    </TableCell>
-                    {!isMobile && (
+              <AnimatePresence>
+                {evaluations
+                  ?.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((evaluation) => (
+                    <AnimatedTableRow
+                      key={evaluation._id}
+                      variants={tableRowVariants}
+                      initial="hidden"
+                      animate="visible"
+                      exit="hidden"
+                      whileHover="hover"
+                    >
                       <TableCell>
-                        {evaluation.evaluationType === 'self'
-                          ? 'Auto-evaluación'
-                          : evaluation.evaluationType === 'peer'
-                          ? 'Entre pares'
-                          : evaluation.evaluationType === 'manager'
-                          ? 'Por supervisor'
-                          : '360°'}
+                        {evaluation.employee?.user?.firstName} {evaluation.employee?.user?.lastName}
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <Chip
-                        label={getStatusLabel(evaluation.status)}
-                        color={getStatusColor(evaluation.status) as any}
-                        size={isMobile ? 'small' : 'medium'}
-                      />
-                    </TableCell>
-                    {!isMobile && (
+                      <TableCell>{evaluation.evaluationType}</TableCell>
                       <TableCell>
-                        <Box display="flex" alignItems="center">
-                          <CircularProgress
-                            variant="determinate"
-                            value={evaluation.progress || 0}
-                            size={24}
-                            sx={{ mr: 1 }}
-                          />
-                          <Typography variant="body2">{evaluation.progress || 0}%</Typography>
-                        </Box>
+                        <Chip
+                          label={evaluation.status}
+                          color={
+                            evaluation.status === 'completed'
+                              ? 'success'
+                              : evaluation.status === 'in_progress'
+                              ? 'warning'
+                              : 'default'
+                          }
+                          size="small"
+                        />
                       </TableCell>
-                    )}
-                    <TableCell align="right">
-                      <Stack direction="row" spacing={1} justifyContent="flex-end">
-                        <IconButton
-                          size="small"
-                          onClick={() => handleOpenEdit(evaluation)}
-                          disabled={isUpdating}
-                        >
-                          <EditIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(evaluation._id)}
-                          disabled={isDeleting}
-                          color="error"
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Stack>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      <TableCell>{evaluation.progress}%</TableCell>
+                      {!isMobile && (
+                        <TableCell>
+                          {new Date(evaluation.period.startDate).toLocaleDateString()}
+                        </TableCell>
+                      )}
+                      {!isMobile && (
+                        <TableCell>
+                          {new Date(evaluation.period.endDate).toLocaleDateString()}
+                        </TableCell>
+                      )}
+                      <TableCell align="right">
+                        <Stack direction="row" spacing={1} justifyContent="flex-end">
+                          <IconButton
+                            size="small"
+                            onClick={() => handleOpenForm(evaluation)}
+                            disabled={isUpdating}
+                          >
+                            <EditIcon fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteEvaluation(evaluation._id)}
+                            disabled={isDeleting}
+                          >
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Stack>
+                      </TableCell>
+                    </AnimatedTableRow>
+                  ))}
+              </AnimatePresence>
             </TableBody>
-          </Table>
+          </AnimatedTable>
         </TableContainer>
         <TablePagination
+          rowsPerPageOptions={[5, 10, 25]}
           component="div"
           count={evaluations?.length || 0}
+          rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage={isMobile ? 'Filas:' : 'Filas por página:'}
         />
       </Paper>
 
       <EvaluationForm
         open={openForm}
         onClose={handleCloseForm}
-        onSubmit={handleSubmit}
         evaluation={selectedEvaluation}
-        employees={employees}
+        employees={employees || []}
+        onSubmit={selectedEvaluation ? updateEvaluation : createEvaluation}
         isLoading={isCreating || isUpdating}
         mode={selectedEvaluation ? 'edit' : 'create'}
       />
@@ -276,4 +277,4 @@ const Evaluations: React.FC = () => {
   );
 };
 
-export default Evaluations; 
+export default Evaluations;

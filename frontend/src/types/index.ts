@@ -15,6 +15,7 @@ export interface Employee {
   user: User;
   position: string;
   department: string;
+  manager?: Employee;
   startDate: string;
   status: 'active' | 'inactive';
   directReports: Employee[];

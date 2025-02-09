@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useMemo } from "react";
 import {
   Box,
   Button,
@@ -47,12 +47,19 @@ const Employees: React.FC = () => {
     updateError,
   } = useEmployees();
 
-  const [page, setPage] = React.useState(0);
-  const [rowsPerPage, setRowsPerPage] = React.useState(10);
-  const [openDialog, setOpenDialog] = React.useState(false);
-  const [selectedEmployee, setSelectedEmployee] =
-    React.useState<Employee | null>(null);
-  const [formError, setFormError] = React.useState<Error | null>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [openDialog, setOpenDialog] = useState(false);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [formError, setFormError] = useState<Error | null>(null);
+
+  // Filter managers from employees list
+  const managers = useMemo(() => 
+    employees?.filter(emp => 
+      emp.user.role === 'manager' || emp.user.role === 'admin'
+    ) || [], 
+    [employees]
+  );
 
   const handleChangePage = (_: unknown, newPage: number) => {
     setPage(newPage);
@@ -82,15 +89,29 @@ const Employees: React.FC = () => {
   };
 
   const handleSubmit = async (formData: FormData) => {
-    const employeeData = {
+    const employeeData: {
+      firstName: string;
+      lastName: string;
+      position: string;
+      department: string;
+      role: "admin" | "manager" | "employee";
+      status: "active" | "inactive";
+      email: string;
+      managerId?: string;
+    } = {
       firstName: formData.get("firstName") as string,
       lastName: formData.get("lastName") as string,
-      email: formData.get("email") as string,
       position: formData.get("position") as string,
       department: formData.get("department") as string,
       role: formData.get("role") as "admin" | "manager" | "employee",
       status: formData.get("status") as "active" | "inactive",
+      email: selectedEmployee ? '' : formData.get("email") as string
     };
+
+    const managerId = formData.get("managerId") as string;
+    if (managerId && managerId !== 'remove') {
+      employeeData.managerId = managerId;
+    }
 
     try {
       setFormError(null);
@@ -174,6 +195,7 @@ const Employees: React.FC = () => {
                 )}
                 <TableCell>Rol</TableCell>
                 <TableCell>Estado</TableCell>
+                <TableCell>Manager</TableCell>
                 <TableCell align="right">Acciones</TableCell>
               </TableRow>
             </TableHead>
@@ -248,6 +270,11 @@ const Employees: React.FC = () => {
                         size="small"
                       />
                     </TableCell>
+                    <TableCell>
+                      {employee.manager ? 
+                        `${employee.manager.user.firstName} ${employee.manager.user.lastName}` : 
+                        'Sin manager'}
+                    </TableCell>
                     <TableCell align="right">
                       <Stack
                         direction="row"
@@ -304,6 +331,7 @@ const Employees: React.FC = () => {
         isLoading={isCreating || isUpdating}
         error={formError || createError || updateError}
         mode={selectedEmployee ? "edit" : "create"}
+        managers={managers}
       />
     </Box>
   );

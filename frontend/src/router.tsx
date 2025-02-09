@@ -21,6 +21,8 @@ import Unauthorized from '@/pages/Unauthorized';
 import MainLayout from '@/components/layout/MainLayout';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
 import EvaluationForm from '@/pages/EvaluationForm';
+import { ForgotPassword } from '@/components/auth/ForgotPassword';
+import { ResetPassword } from '@/components/auth/ResetPassword';
 
 // Root Route
 const rootRoute = createRootRoute({
@@ -51,6 +53,18 @@ const registerRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/register',
   component: RegisterForm,
+});
+
+const forgotPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/forgot-password',
+  component: ForgotPassword,
+});
+
+const resetPasswordRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/reset-password/$token',
+  component: ResetPassword,
 });
 
 const unauthorizedRoute = createRoute({
@@ -185,6 +199,8 @@ const notFoundRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   loginRoute,
   registerRoute,
+  forgotPasswordRoute,
+  resetPasswordRoute,
   unauthorizedRoute,
   notFoundRoute,
   protectedLayoutRoute.addChildren([

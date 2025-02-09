@@ -8,6 +8,7 @@ const { validateEvaluation, validateEvaluationUpdate } = require('../middlewares
 router.use(verifyToken);
 
 // Rutas públicas (para usuarios autenticados)
+router.get('/pending', evaluationController.getPendingEvaluations);
 router.get('/', evaluationController.getAllEvaluations);
 router.get('/:id', evaluationController.getEvaluation);
 

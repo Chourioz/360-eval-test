@@ -2,11 +2,14 @@ import React from 'react';
 import {
   Box,
   Grid,
-  Paper,
+  Paper as MuiPaper,
   Typography,
-  Card,
+  Card as MuiCard,
   CardContent,
   useTheme,
+  CircularProgress,
+  Alert,
+  SvgIconProps,
 } from '@mui/material';
 import {
   Assessment,
@@ -27,155 +30,201 @@ import {
   Pie,
   Cell,
 } from 'recharts';
-import { useAuth } from '@/hooks/useAuth';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  staggeredListVariants, 
+  listItemVariants, 
+  cardVariants,
+  FadeIn 
+} from '@/components/animations';
+import { useDashboard } from '@/hooks/useDashboard';
 
-// Datos de ejemplo para los gráficos
-const performanceData = [
-  { month: 'Ene', score: 3.5 },
-  { month: 'Feb', score: 3.8 },
-  { month: 'Mar', score: 3.6 },
-  { month: 'Abr', score: 4.0 },
-  { month: 'May', score: 4.2 },
-  { month: 'Jun', score: 4.1 },
-];
-
-const feedbackDistribution = [
-  { name: 'Excelente', value: 30 },
-  { name: 'Bueno', value: 45 },
-  { name: 'Regular', value: 20 },
-  { name: 'Necesita Mejorar', value: 5 },
-];
-
-const COLORS = ['#4CAF50', '#2196F3', '#FFC107', '#F44336'];
+const Card = motion(MuiCard);
+const Paper = motion(MuiPaper);
 
 interface StatCardProps {
   title: string;
   value: string | number;
-  icon: React.ReactNode;
-  description: string;
+  icon: React.ComponentType<SvgIconProps>;
+  color: string;
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, description }) => (
-  <Card>
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon: Icon, color }) => (
+  <Card
+    variants={cardVariants}
+    initial="initial"
+    animate="animate"
+    whileHover="hover"
+  >
     <CardContent>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h6" component="div" gutterBottom>
+          <Typography color="textSecondary" gutterBottom variant="h6">
             {title}
           </Typography>
-          <Typography variant="h4" component="div" sx={{ mb: 1 }}>
-            {value}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {description}
-          </Typography>
+          <Typography variant="h4">{value}</Typography>
         </Box>
-        <Box sx={{ color: 'primary.main', display: 'flex', p: 1 }}>{icon}</Box>
+        <Icon sx={{ fontSize: 40, color }} />
       </Box>
     </CardContent>
   </Card>
 );
 
+interface FeedbackDistributionItem {
+  name: string;
+  value: number;
+}
+
 const Dashboard: React.FC = () => {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { stats, isLoading, error } = useDashboard();
+
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ mt: 2 }}>
+        <Alert severity="error">
+          Error al cargar las estadísticas del dashboard. Por favor, intente nuevamente.
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Dashboard
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Bienvenido, {user?.firstName} {user?.lastName}
-      </Typography>
+      <FadeIn>
+        <Typography variant="h4" gutterBottom>
+          Dashboard
+        </Typography>
+      </FadeIn>
 
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        {/* Tarjetas de estadísticas */}
-        <Grid item xs={12} sm={6} lg={3}>
-          <StatCard
-            title="Evaluaciones"
-            value="4"
-            icon={<Assessment fontSize="large" />}
-            description="Evaluaciones pendientes"
-          />
+      <motion.div
+        variants={staggeredListVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Grid container spacing={3}>
+          <Grid item xs={12} sm={6} md={3}
+            component={motion.div}
+            variants={listItemVariants}
+          >
+            <StatCard
+              title="Evaluaciones Pendientes"
+              value={stats?.pendingEvaluations || 0}
+              icon={Assessment}
+              color={theme.palette.primary.main}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}
+            component={motion.div}
+            variants={listItemVariants}
+          >
+            <StatCard
+              title="Feedback Mensual"
+              value={stats?.monthlyFeedback || 0}
+              icon={Feedback}
+              color={theme.palette.success.main}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}
+            component={motion.div}
+            variants={listItemVariants}
+          >
+            <StatCard
+              title="Promedio de Desempeño"
+              value={stats?.averageScore || '0.0'}
+              icon={TrendingUp}
+              color={theme.palette.info.main}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}
+            component={motion.div}
+            variants={listItemVariants}
+          >
+            <StatCard
+              title="Miembros del Equipo"
+              value={stats?.teamCount || 0}
+              icon={Group}
+              color={theme.palette.warning.main}
+            />
+          </Grid>
         </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <StatCard
-            title="Feedback"
-            value="12"
-            icon={<Feedback fontSize="large" />}
-            description="Feedback recibido este mes"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <StatCard
-            title="Promedio"
-            value="4.2"
-            icon={<TrendingUp fontSize="large" />}
-            description="Puntuación promedio"
-          />
-        </Grid>
-        <Grid item xs={12} sm={6} lg={3}>
-          <StatCard
-            title="Equipo"
-            value="8"
-            icon={<Group fontSize="large" />}
-            description="Miembros en tu equipo"
-          />
-        </Grid>
+      </motion.div>
 
-        {/* Gráficos */}
-        <Grid item xs={12} lg={8}>
-          <Paper sx={{ p: 3, height: '100%' }}>
+      <Grid container spacing={3} sx={{ mt: 3 }}>
+        <Grid item xs={12} md={8}>
+          <Paper
+            variants={cardVariants}
+            initial="initial"
+            animate="animate"
+            whileHover="hover"
+            sx={{ p: 2 }}
+          >
             <Typography variant="h6" gutterBottom>
-              Evolución del Desempeño
+              Tendencia de Desempeño
             </Typography>
-            <Box sx={{ height: { xs: 300, md: 400 }, width: '100%' }}>
-              <ResponsiveContainer>
-                <LineChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis domain={[0, 5]} />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke={theme.palette.primary.main}
-                    activeDot={{ r: 8 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </Box>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={stats?.performanceData || []}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  stroke={theme.palette.primary.main}
+                  activeDot={{ r: 8 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
-
-        <Grid item xs={12} lg={4}>
-          <Paper sx={{ p: 3, height: '100%' }}>
+        <Grid item xs={12} md={4}>
+          <Paper
+            variants={cardVariants}
+            initial="initial"
+            animate="animate"
+            whileHover="hover"
+            sx={{ p: 2 }}
+          >
             <Typography variant="h6" gutterBottom>
               Distribución de Feedback
             </Typography>
-            <Box sx={{ height: { xs: 300, md: 400 }, width: '100%' }}>
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie
-                    data={feedbackDistribution}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    outerRadius="80%"
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  >
-                    {feedbackDistribution.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </Box>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={stats?.feedbackDistribution || []}
+                  dataKey="value"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={80}
+                  label
+                >
+                  {(stats?.feedbackDistribution || []).map((entry: FeedbackDistributionItem, index: number) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={[
+                        theme.palette.primary.main,
+                        theme.palette.secondary.main,
+                        theme.palette.success.main,
+                        theme.palette.error.main,
+                      ][index % 4]} 
+                    />
+                  ))}
+                </Pie>
+                <Tooltip />
+                <Legend />
+              </PieChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
       </Grid>

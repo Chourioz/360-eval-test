@@ -10,9 +10,10 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Grid,
   Alert,
-  CircularProgress
+  Box,
+  CircularProgress,
+  FormHelperText,
 } from '@mui/material';
 import type { Employee } from '@/types';
 
@@ -24,6 +25,7 @@ interface EmployeeFormProps {
   isLoading?: boolean;
   error?: Error | null;
   mode: 'create' | 'edit';
+  managers: Employee[];
 }
 
 const EmployeeForm: React.FC<EmployeeFormProps> = ({
@@ -33,7 +35,8 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
   employee,
   isLoading,
   error,
-  mode
+  mode,
+  managers
 }) => {
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -44,7 +47,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {mode === 'create' ? 'Crear Nuevo Empleado' : 'Editar Empleado'}
+        {mode === 'create' ? 'Nuevo Empleado' : 'Editar Empleado'}
       </DialogTitle>
       <form onSubmit={handleSubmit}>
         <DialogContent>
@@ -53,81 +56,88 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
               {error.message}
             </Alert>
           )}
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="firstName"
-                label="Nombre"
-                fullWidth
+          <Box display="flex" flexDirection="column" gap={2}>
+            <TextField
+              name="firstName"
+              label="Nombre"
+              defaultValue={employee?.user.firstName || ''}
+              required
+              fullWidth
+            />
+            <TextField
+              name="lastName"
+              label="Apellido"
+              defaultValue={employee?.user.lastName || ''}
+              required
+              fullWidth
+            />
+            <TextField
+              name="email"
+              label="Email"
+              type="email"
+              defaultValue={employee?.user.email || ''}
+              required={mode === 'create'}
+              fullWidth
+              disabled={mode === 'edit'}
+            />
+            <TextField
+              name="position"
+              label="Cargo"
+              defaultValue={employee?.position || ''}
+              required
+              fullWidth
+            />
+            <TextField
+              name="department"
+              label="Departamento"
+              defaultValue={employee?.department || ''}
+              required
+              fullWidth
+            />
+            <FormControl fullWidth>
+              <InputLabel>Rol</InputLabel>
+              <Select
+                name="role"
+                defaultValue={employee?.user.role || 'employee'}
+                label="Rol"
                 required
-                defaultValue={employee?.user.firstName || ''}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="lastName"
-                label="Apellido"
-                fullWidth
+              >
+                <MenuItem value="employee">Empleado</MenuItem>
+                <MenuItem value="manager">Manager</MenuItem>
+                <MenuItem value="admin">Administrador</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Estado</InputLabel>
+              <Select
+                name="status"
+                defaultValue={employee?.status || 'active'}
+                label="Estado"
                 required
-                defaultValue={employee?.user.lastName || ''}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                name="email"
-                label="Email"
-                type="email"
-                fullWidth
-                required
-                defaultValue={employee?.user.email || ''}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="position"
-                label="Cargo"
-                fullWidth
-                required
-                defaultValue={employee?.position || ''}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                name="department"
-                label="Departamento"
-                fullWidth
-                required
-                defaultValue={employee?.department || ''}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Rol</InputLabel>
-                <Select
-                  name="role"
-                  label="Rol"
-                  defaultValue={employee?.user.role || 'employee'}
-                >
-                  <MenuItem value="employee">Empleado</MenuItem>
-                  <MenuItem value="manager">Manager</MenuItem>
-                  <MenuItem value="admin">Administrador</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <FormControl fullWidth required>
-                <InputLabel>Estado</InputLabel>
-                <Select
-                  name="status"
-                  label="Estado"
-                  defaultValue={employee?.status || 'active'}
-                >
-                  <MenuItem value="active">Activo</MenuItem>
-                  <MenuItem value="inactive">Inactivo</MenuItem>
-                </Select>
-              </FormControl>
-            </Grid>
-          </Grid>
+              >
+                <MenuItem value="active">Activo</MenuItem>
+                <MenuItem value="inactive">Inactivo</MenuItem>
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel>Manager</InputLabel>
+              <Select
+                name="managerId"
+                defaultValue={employee?.manager?._id || 'remove'}
+                label="Manager"
+              >
+                <MenuItem value="remove">Sin manager</MenuItem>
+                {managers.map((manager) => (
+                  <MenuItem key={manager._id} value={manager._id}>
+                    {manager.user.firstName} {manager.user.lastName} - {manager.position}
+                  </MenuItem>
+                ))}
+              </Select>
+              <FormHelperText>
+                Seleccione un manager para el empleado o "Sin manager" para remover la asignación
+              </FormHelperText>
+            </FormControl>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={onClose}>Cancelar</Button>
@@ -137,7 +147,7 @@ const EmployeeForm: React.FC<EmployeeFormProps> = ({
             disabled={isLoading}
             startIcon={isLoading ? <CircularProgress size={20} /> : null}
           >
-            {mode === 'create' ? 'Crear' : 'Guardar'}
+            {mode === 'create' ? 'Crear' : 'Actualizar'}
           </Button>
         </DialogActions>
       </form>

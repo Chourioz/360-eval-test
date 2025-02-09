@@ -3,7 +3,7 @@ import {
   Box,
   Typography,
   Grid,
-  Card,
+  Card as MuiCard,
   CardContent,
   CardActions,
   Button,
@@ -11,85 +11,76 @@ import {
   Chip,
   LinearProgress,
   Divider,
+  CircularProgress,
+  Alert,
 } from '@mui/material';
 import {
   Assessment,
-    Schedule,
+  Schedule,
   Edit as EditIcon,
 } from '@mui/icons-material';
-
-interface PendingFeedback {
-  id: string;
-  evaluationType: string;
-  evaluee: {
-    name: string;
-    position: string;
-    department: string;
-  };
-  dueDate: string;
-  progress: number;
-  status: 'not_started' | 'in_progress' | 'completed';
-}
-
-const mockPendingFeedback: PendingFeedback[] = [
-  {
-    id: '1',
-    evaluationType: 'Evaluación 360°',
-    evaluee: {
-      name: 'Juan Pérez',
-      position: 'Desarrollador Senior',
-      department: 'Tecnología',
-    },
-    dueDate: '2024-03-31',
-    progress: 0,
-    status: 'not_started',
-  },
-  {
-    id: '2',
-    evaluationType: 'Evaluación de Pares',
-    evaluee: {
-      name: 'Ana López',
-      position: 'Diseñadora UX',
-      department: 'Diseño',
-    },
-    dueDate: '2024-03-15',
-    progress: 30,
-    status: 'in_progress',
-  },
-  {
-    id: '3',
-    evaluationType: 'Evaluación de Equipo',
-    evaluee: {
-      name: 'Carlos Rodríguez',
-      position: 'Product Manager',
-      department: 'Producto',
-    },
-    dueDate: '2024-03-20',
-    progress: 0,
-    status: 'not_started',
-  },
-];
+import { useNavigate } from '@tanstack/react-router';
+import { usePendingEvaluations } from '@/hooks/useEvaluations';
+import type { PendingEvaluation } from '@/services/evaluation.service';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  staggeredListVariants, 
+  listItemVariants, 
+  cardVariants, 
+  progressVariants,
+  FadeIn 
+} from '@/components/animations';
 
 const statusColors = {
-  not_started: 'warning',
+  draft: 'warning',
   in_progress: 'info',
-  completed: 'success',
+  pending_review: 'success',
 } as const;
 
 const statusLabels = {
-  not_started: 'Por Comenzar',
+  draft: 'Por Comenzar',
   in_progress: 'En Progreso',
-  completed: 'Completado',
+  pending_review: 'En Revisión',
 } as const;
 
+const Card = motion(MuiCard);
+
 const PendingFeedback: React.FC = () => {
+  const navigate = useNavigate();
+  const { evaluations, isLoading, error } = usePendingEvaluations();
+
   const handleProvideFeedback = (id: string) => {
-    // TODO: Implementar la navegación a la página de feedback
-    console.log('Navegando a la página de feedback:', id);
+    navigate({
+      to: '/evaluations/$id',
+      params: { id }
+    });
   };
 
-  const FeedbackCard: React.FC<{ feedback: PendingFeedback }> = ({ feedback }) => (
-    <Card>
+  if (isLoading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ mt: 2 }}>
+        <Alert severity="error">
+          Error al cargar las evaluaciones pendientes. Por favor, intente nuevamente.
+        </Alert>
+      </Box>
+    );
+  }
+
+  const FeedbackCard: React.FC<{ feedback: PendingEvaluation }> = ({ feedback }) => (
+    <Card
+      variants={cardVariants}
+      initial="initial"
+      animate="animate"
+      whileHover="hover"
+    >
       <CardContent>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -138,11 +129,18 @@ const PendingFeedback: React.FC = () => {
               {feedback.progress}%
             </Typography>
           </Box>
-          <LinearProgress
-            variant="determinate"
-            value={feedback.progress}
-            sx={{ height: 8, borderRadius: 4 }}
-          />
+          <motion.div
+            initial="initial"
+            animate="animate"
+            variants={progressVariants}
+            custom={feedback.progress}
+          >
+            <LinearProgress
+              variant="determinate"
+              value={feedback.progress}
+              sx={{ height: 8, borderRadius: 4 }}
+            />
+          </motion.div>
         </Box>
       </CardContent>
       <Divider />
@@ -153,7 +151,7 @@ const PendingFeedback: React.FC = () => {
           startIcon={<EditIcon />}
           onClick={() => handleProvideFeedback(feedback.id)}
         >
-          {feedback.status === 'not_started'
+          {feedback.status === 'draft'
             ? 'Proporcionar Feedback'
             : 'Continuar Feedback'}
         </Button>
@@ -163,20 +161,33 @@ const PendingFeedback: React.FC = () => {
 
   return (
     <Box>
-      <Typography variant="h4" gutterBottom>
-        Feedback Pendiente
-      </Typography>
-      <Typography variant="subtitle1" color="text.secondary" gutterBottom>
-        Tienes {mockPendingFeedback.length} evaluaciones pendientes de retroalimentación.
-      </Typography>
+      <FadeIn>
+        <Typography variant="h4" gutterBottom>
+          Feedback Pendiente
+        </Typography>
+        <Typography variant="subtitle1" color="text.secondary" gutterBottom>
+          Tienes {evaluations?.length || 0} evaluaciones pendientes de retroalimentación.
+        </Typography>
+      </FadeIn>
 
-      <Grid container spacing={3} sx={{ mt: 1 }}>
-        {mockPendingFeedback.map((feedback) => (
-          <Grid item xs={12} md={6} key={feedback.id}>
-            <FeedbackCard feedback={feedback} />
-          </Grid>
-        ))}
-      </Grid>
+      <motion.div
+        variants={staggeredListVariants}
+        initial="hidden"
+        animate="visible"
+      >
+        <Grid container spacing={3} sx={{ mt: 1 }}>
+          <AnimatePresence>
+            {evaluations?.map((feedback) => (
+              <Grid item xs={12} md={6} key={feedback.id}
+                component={motion.div}
+                variants={listItemVariants}
+              >
+                <FeedbackCard feedback={feedback} />
+              </Grid>
+            ))}
+          </AnimatePresence>
+        </Grid>
+      </motion.div>
     </Box>
   );
 };

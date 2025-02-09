@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { useAuth } from "@/hooks/useAuth";
 import type { LoginCredentials } from "@/types";
+import { Link } from "@tanstack/react-router";
 
 const schema = z.object({
   email: z
@@ -146,6 +147,15 @@ const LoginFormComponent: React.FC = () => {
               Regístrate
             </Button>
           </Typography>
+        </Box>
+
+        <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+          <Link to="/register" style={{ textDecoration: 'none' }}>
+            <Button variant="text">Registrarse</Button>
+          </Link>
+          <Link to="/forgot-password" style={{ textDecoration: 'none' }}>
+            <Button variant="text">¿Olvidaste tu contraseña?</Button>
+          </Link>
         </Box>
       </Paper>
     </Box>

@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { evaluationService } from '@/services/evaluation.service';
 import type { Evaluation } from '@/types';
+import type { PendingEvaluation } from '@/services/evaluation.service';
 
 interface EvaluationsResponse {
   status: string;
@@ -75,5 +76,28 @@ export function useEvaluations() {
     completeLoading,
     deleteEvaluation,
     deleteLoading
+  };
+}
+
+export function usePendingEvaluations() {
+  const {
+    data: evaluations,
+    isLoading,
+    error,
+    refetch
+  } = useQuery<PendingEvaluation[]>({
+    queryKey: ['pending-evaluations'],
+    queryFn: async () => {
+      const response = await evaluationService.getPendingEvaluations();
+      return response.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  return {
+    evaluations,
+    isLoading,
+    error,
+    refetch
   };
 } 

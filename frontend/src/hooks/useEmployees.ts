@@ -2,6 +2,20 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { employeeService } from '@/services/employee.service';
 import type { Employee } from '@/types';
 
+interface UpdateEmployeeParams {
+  id: string;
+  data: {
+    firstName?: string;
+    lastName?: string;
+    email?: string;
+    position?: string;
+    department?: string;
+    role?: 'admin' | 'manager' | 'employee';
+    status?: 'active' | 'inactive';
+    managerId?: string;
+  };
+}
+
 export function useEmployees() {
   const queryClient = useQueryClient();
 
@@ -25,7 +39,7 @@ export function useEmployees() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Parameters<typeof employeeService.updateEmployee>[1] }) =>
+    mutationFn: ({ id, data }: UpdateEmployeeParams) =>
       employeeService.updateEmployee(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] });

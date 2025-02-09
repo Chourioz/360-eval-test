@@ -3,6 +3,7 @@ const { AppError } = require('./errorHandler');
 
 exports.validate = (req, res, next) => {
   const errors = validationResult(req);
+  console.log(errors);
   if (!errors.isEmpty()) {
     const errorMessages = errors.array().map(err => ({
       field: err.path,

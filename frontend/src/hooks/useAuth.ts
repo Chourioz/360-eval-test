@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { authService } from '@/services/auth.service';
-import type { LoginCredentials, RegisterData } from '@/types';
+import type { LoginCredentials, RegisterData, User, Employee } from '@/types';
 import { useNavigate } from '@tanstack/react-router';
+import { authService } from '@/services/auth.service';
 
 export function useAuth() {
   const queryClient = useQueryClient();
@@ -53,15 +53,25 @@ export function useAuth() {
       authService.updatePassword(currentPassword, newPassword),
   });
 
+  const user = authData?.data?.user;
+  const employee = authData?.data?.employee;
+  const isAuthenticated = !!user && !isError;
+  const error = loginMutation.error || registerMutation.error;
+  const login = loginMutation.mutate;
+  const register = registerMutation.mutate;
+  const logout = logoutMutation.mutate;
+  const updatePassword = updatePasswordMutation.mutate;
+
   return {
-    user: authData?.data?.user,
-    employee: authData?.data?.employee,
-    isAuthenticated: !!authData?.data?.user && !isError,
+    user,
+    employee,
+    isAuthenticated,
     isLoading: isAuthLoading || loginMutation.isPending || registerMutation.isPending,
-    error: loginMutation.error || registerMutation.error,
-    login: loginMutation.mutate,
-    register: registerMutation.mutate,
-    logout: logoutMutation.mutate,
-    updatePassword: updatePasswordMutation.mutate,
+    error,
+    login,
+    register,
+    logout,
+    updatePassword,
+    authService
   };
 } 

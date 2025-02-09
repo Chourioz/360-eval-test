@@ -70,6 +70,19 @@ class AuthService {
   logout(): void {
     this.removeToken();
   }
+
+  // Password recovery methods
+  forgotPassword(email: string): Promise<any> {
+    return apiService.post("/auth/forgot-password", { email });
+  }
+
+  resetPassword(token: string, password: string): Promise<any> {
+    return apiService.post("/auth/reset-password", { token, password });
+  }
+
+  verifyResetToken(token: string): Promise<any> {
+    return apiService.post("/auth/verify-reset-token", { token });
+  }
 }
 
 export const authService = new AuthService();

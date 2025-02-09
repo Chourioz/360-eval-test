@@ -1,8 +1,10 @@
 const { body, validationResult } = require('express-validator');
 const { AppError } = require('./errorHandler');
+const mongoose = require('mongoose');
+const { validate: validateRequest } = require('./validate');
 
 // Validación completa para creación de evaluación
-exports.validateEvaluation = [
+const validateEvaluation = [
   body('employee').notEmpty().withMessage('El empleado es requerido'),
   body('evaluationType').isIn(['self', '360', 'peer']).withMessage('Tipo de evaluación inválido'),
   body('period').isObject().withMessage('El período es requerido'),
@@ -35,7 +37,7 @@ exports.validateEvaluation = [
 ];
 
 // Validación parcial para actualización de evaluación
-exports.validateEvaluationUpdate = [
+const validateEvaluationUpdate = [
   body('evaluationType')
     .optional()
     .isIn(['self', '360', 'peer'])
@@ -74,7 +76,7 @@ exports.validateEvaluationUpdate = [
 ];
 
 // Validación de feedback
-exports.validateFeedback = [
+const validateFeedback = [
   body('feedback')
     .isArray()
     .withMessage('El feedback debe ser un array')
@@ -114,4 +116,164 @@ exports.validateFeedback = [
     }
     next();
   },
-]; 
+];
+
+// Employee validation
+const validateEmployee = [
+  body('email')
+    .isEmail()
+    .withMessage('Please provide a valid email'),
+  body('firstName')
+    .notEmpty()
+    .withMessage('First name is required'),
+  body('lastName')
+    .notEmpty()
+    .withMessage('Last name is required'),
+  body('position')
+    .notEmpty()
+    .withMessage('Position is required'),
+  body('department')
+    .notEmpty()
+    .withMessage('Department is required'),
+  body('role')
+    .optional()
+    .isIn(['admin', 'manager', 'employee'])
+    .withMessage('Invalid role'),
+  body('status')
+    .optional()
+    .isIn(['active', 'inactive'])
+    .withMessage('Invalid status')
+];
+
+const validateEmployeeUpdate = [
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Please provide a valid email'),
+  body('firstName')
+    .optional()
+    .notEmpty()
+    .withMessage('First name cannot be empty'),
+  body('lastName')
+    .optional()
+    .notEmpty()
+    .withMessage('Last name cannot be empty'),
+  body('position')
+    .optional()
+    .notEmpty()
+    .withMessage('Position cannot be empty'),
+  body('department')
+    .optional()
+    .notEmpty()
+    .withMessage('Department cannot be empty'),
+  body('role')
+    .optional()
+    .isIn(['admin', 'manager', 'employee'])
+    .withMessage('Invalid role'),
+  body('status')
+    .optional()
+    .isIn(['active', 'inactive'])
+    .withMessage('Invalid status'),
+  body('managerId')
+    .optional()
+    .custom(value => {
+      if (value === 'remove') return true;
+      return mongoose.Types.ObjectId.isValid(value);
+    })
+    .withMessage('Invalid manager ID format')
+];
+
+// Validate forgot password request
+const validateForgotPassword = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Please provide a valid email address'),
+  validateRequest
+];
+
+// Validate reset password request
+const validateResetPassword = [
+  body('token')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required')
+    .isLength({ min: 64, max: 64 })
+    .withMessage('Invalid reset token format'),
+  body('password')
+    .trim()
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ min: 6 })
+    .withMessage('Password must be at least 8 characters long')
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&.])[A-Za-z\d@$!%*?&.].*$/)
+    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number and one special character (@$!%*?&)')
+];
+
+// Validate verify reset token request
+const validateVerifyResetToken = [
+  body('token')
+    .trim()
+    .notEmpty()
+    .withMessage('Reset token is required')
+    .isLength({ min: 64, max: 64 })
+    .withMessage('Invalid reset token format'),
+  validateRequest
+];
+
+// Auth validation middleware
+const validateLogin = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Please provide a valid email address'),
+  body('password')
+    .trim()
+    .notEmpty()
+    .withMessage('Password is required')
+];
+
+const validateRegister = [
+  body('email')
+    .trim()
+    .notEmpty()
+    .withMessage('Email is required')
+    .isEmail()
+    .withMessage('Please provide a valid email address'),
+  body('password')
+    .trim()
+    .notEmpty()
+    .withMessage('Password is required')
+    .isLength({ min: 8 })
+    .withMessage('Password must be at least 8 characters long'),
+  body('firstName')
+    .trim()
+    .notEmpty()
+    .withMessage('First name is required'),
+  body('lastName')
+    .trim()
+    .notEmpty()
+    .withMessage('Last name is required'),
+  body('role')
+    .optional()
+    .isIn(['admin', 'manager', 'employee'])
+    .withMessage('Invalid role')
+];
+
+// Export all validators
+module.exports = {
+  validateLogin,
+  validateRegister,
+  validateForgotPassword,
+  validateResetPassword,
+  validateVerifyResetToken,
+  validateEvaluation,
+  validateEvaluationUpdate,
+  validateFeedback,
+  validateEmployee,
+  validateEmployeeUpdate
+}; 

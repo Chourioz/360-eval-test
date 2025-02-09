@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const { AppError } = require('../middlewares/errorHandler');
 const User = require('../models/User');
 const Employee = require('../models/Employee');
@@ -147,6 +148,124 @@ exports.updatePassword = async (req, res, next) => {
     createSendToken(user, 200, res);
   } catch (error) {
     logger.error('Error in updatePassword:', error);
+    next(error);
+  }
+};
+
+// Generate reset token
+const generateResetToken = () => {
+  const resetToken = crypto.randomBytes(32).toString('hex');
+  const hashedToken = crypto
+    .createHash('sha256')
+    .update(resetToken)
+    .digest('hex');
+  
+  return { resetToken, hashedToken };
+};
+
+// Forgot password
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return next(new AppError('No user found with that email address', 404));
+    }
+
+    // Generate reset token
+    const { resetToken, hashedToken } = generateResetToken();
+
+    // Save hashed token to user
+    user.resetPasswordToken = hashedToken;
+    user.resetPasswordExpires = Date.now() + 3600000; // 1 hour
+    await user.save({ validateBeforeSave: false });
+
+    // TODO: Send email with reset token
+    // For now, we'll just return the token in the response
+    // In production, you should send this via email
+    res.status(200).json({
+      status: 'success',
+      message: 'Token sent to email',
+      resetToken // Remove this in production
+    });
+  } catch (error) {
+    logger.error('Error in forgotPassword:', error);
+    next(error);
+  }
+};
+
+// Reset password
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { token: resetToken, password } = req.body;
+
+    // Hash token from request
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Find user with valid token
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return next(new AppError('Token is invalid or has expired', 400));
+    }
+
+    // Update password
+    user.password = password;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    // Log user in
+    const authToken = signToken(user._id);
+    res.status(200).json({
+      status: 'success',
+      token: authToken,
+      data: {
+        user: user.toPublicJSON()
+      }
+    });
+  } catch (error) {
+    logger.error('Error in resetPassword:', error);
+    next(error);
+  }
+};
+
+// Verify reset token
+exports.verifyResetToken = async (req, res, next) => {
+  try {
+    const { token: resetToken } = req.body;
+
+    // Hash token from request
+    const hashedToken = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Find user with valid token
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return next(new AppError('Token is invalid or has expired', 400));
+    }
+
+    res.status(200).json({
+      status: 'success',
+      data: {
+        email: user.email
+      }
+    });
+  } catch (error) {
+    logger.error('Error in verifyResetToken:', error);
     next(error);
   }
 }; 

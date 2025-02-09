@@ -697,4 +697,53 @@ exports.submitFeedback = async (req, res, next) => {
   }
 };
 
+// Get pending evaluations for the current user
+exports.getPendingEvaluations = async (req, res, next) => {
+  try {
+    const evaluations = await Evaluation.find({
+      'evaluators.user': req.user._id,
+      'evaluators.status': { $in: ['draft', 'in_progress', 'pending_review'] },
+      'status': 'in_progress'
+    })
+    .populate({
+      path: 'employee',
+      select: 'position department user',
+      populate: {
+        path: 'user',
+        select: 'firstName lastName'
+      }
+    })
+    .select('evaluationType period categories evaluators');
+
+    const pendingEvaluations = evaluations.map(evaluation => {
+      const evaluator = evaluation.evaluators.find(
+        e => e.user.toString() === req.user._id.toString()
+      );
+
+      return {
+        id: evaluation._id,
+        evaluationType: evaluation.evaluationType,
+        evaluee: {
+          name: `${evaluation.employee.user.firstName} ${evaluation.employee.user.lastName}`,
+          position: evaluation.employee.position,
+          department: evaluation.employee.department
+        },
+        dueDate: evaluation.period.endDate,
+        status: evaluator.status,
+        progress: evaluator.feedback ? 
+          (evaluator.feedback.length / evaluation.categories.reduce((acc, cat) => acc + cat.criteria.length, 0)) * 100 : 0
+      };
+    });
+
+    res.status(200).json({
+      status: 'success',
+      results: pendingEvaluations.length,
+      data: pendingEvaluations
+    });
+  } catch (error) {
+    logger.error('Error al obtener evaluaciones pendientes:', error);
+    next(error);
+  }
+};
+
 module.exports = exports;
